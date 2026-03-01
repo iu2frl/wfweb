@@ -755,6 +755,453 @@ html, body {
     50% { border-color: #aa0; }
 }
 
+/* ── DIGI Bar (blue theme, WSJT-X inspired) ── */
+.digi-bar {
+    position: fixed;
+    bottom: 44px;
+    left: 0; right: 0;
+    background: #000510;
+    border-top: 2px solid #048;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    height: 55vh;
+    min-height: 300px;
+}
+.digi-bar.hidden { display: none; }
+
+.digi-bar-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border-bottom: 1px solid #048;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.digi-label {
+    color: #08f;
+    font-weight: bold;
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    padding: 2px 7px;
+    border: 1px solid #048;
+    border-radius: 3px;
+    min-width: 38px;
+    text-align: center;
+    user-select: none;
+}
+.digi-label:active { background: #048; color: #000; }
+.digi-period-clock {
+    color: #08f;
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    font-weight: bold;
+    min-width: 28px;
+    text-align: center;
+}
+.digi-status {
+    color: #666;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    min-width: 60px;
+}
+.digi-status.tx { color: #f44; font-weight: bold; }
+.digi-status.decoding { color: #ff0; }
+.digi-band-sel {
+    background: #000820;
+    border: 1px solid #048;
+    color: #8cf;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    padding: 2px 3px;
+    border-radius: 2px;
+    cursor: pointer;
+}
+.digi-cq-label {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    color: #8cf;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.digi-cq-label input[type=checkbox] { accent-color: #08f; cursor: pointer; }
+.digi-settings-btn {
+    padding: 2px 7px;
+    background: #001020;
+    border: 1px solid #048;
+    color: #08f;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 2px;
+    margin-left: auto;
+}
+.digi-settings-btn:active { background: #048; color: #000; }
+.digi-rx-toggle {
+    padding: 2px 7px;
+    background: #001020;
+    border: 1px solid #048;
+    color: #08f;
+    font-size: 11px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.digi-rx-toggle.active { background: #048; color: #000; border-color: #08f; }
+.digi-close-btn {
+    padding: 2px 7px;
+    background: #1a0010;
+    border: 1px solid #600;
+    color: #f44;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 2px;
+    font-family: 'Courier New', monospace;
+}
+.digi-close-btn:active { background: #600; }
+
+/* Two-column decode area */
+.digi-decode-area {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    border-bottom: 1px solid #024;
+}
+.digi-decode-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+.digi-decode-col + .digi-decode-col { border-left: 1px solid #024; }
+.digi-col-header {
+    background: #000820;
+    color: #08f;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-bottom: 1px solid #024;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.digi-rx-panel, .digi-directed-panel {
+    flex: 1;
+    overflow-y: auto;
+    background: #000308;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+}
+.digi-directed-panel { background: #000205; }
+.digi-rx-panel:empty::after {
+    content: 'Waiting for decode…';
+    color: #336;
+    display: block;
+    padding: 6px 10px;
+    font-style: italic;
+}
+.digi-directed-panel:empty::after {
+    content: 'Directed messages appear here';
+    color: #225;
+    display: block;
+    padding: 6px 10px;
+    font-style: italic;
+}
+.digi-decode-row {
+    display: flex;
+    gap: 4px;
+    padding: 2px 6px;
+    border-bottom: 1px solid #011;
+    cursor: pointer;
+    align-items: baseline;
+}
+.digi-decode-row:hover { background: #001428; }
+.digi-decode-row.cq-row { background: #001830; }
+.digi-decode-row.cq-row:hover { background: #002040; }
+.digi-decode-row.highlight { background: #002850; border-left: 3px solid #08f; }
+.digi-decode-row.directed { background: #1a1000; border-left: 3px solid #f80; }
+.digi-decode-row.directed:hover { background: #251800; }
+.digi-decode-row.tx-row { background: #001a00; border-left: 3px solid #0a0; }
+.digi-decode-row.digi-tx-pending { background: #001020; border-left: 3px solid #444; color: #668; }
+.digi-decode-row.digi-tx-pending .digi-decode-msg { color: #88a; font-style: italic; }
+.digi-decode-row.digi-tx-pending .digi-decode-snr { color: #666; }
+.digi-slot-divider { border-top: 1px solid #048; margin: 4px 0 2px 0; padding: 2px 6px; text-align: center; }
+.digi-slot-divider .digi-slot-time { color: #08f; font-size: 10px; font-weight: bold; }
+.digi-decode-time { color: #556; min-width: 36px; font-size: 10px; }
+.digi-decode-snr  { color: #8cf; min-width: 30px; text-align: right; font-size: 11px; }
+.digi-decode-dt   { color: #556; min-width: 26px; font-size: 10px; }
+.digi-decode-freq { color: #08f; min-width: 34px; text-align: right; font-size: 11px; }
+.digi-decode-msg  { color: #cef; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.digi-decode-row.cq-row .digi-decode-msg { color: #8cf; font-weight: bold; }
+.digi-decode-row.highlight .digi-decode-msg { color: #fff; }
+.digi-decode-row.directed .digi-decode-msg { color: #ffc060; font-weight: bold; }
+.digi-decode-row.tx-row .digi-decode-msg { color: #8f8; }
+
+/* 6 QSO message rows */
+.digi-msg-rows { border-bottom: 1px solid #024; background: #000410; flex-shrink: 0; }
+.digi-msg-row {
+    display: flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-bottom: 1px solid #011;
+    cursor: pointer;
+    gap: 6px;
+    min-height: 20px;
+}
+.digi-msg-row:hover { background: #001428; }
+.digi-msg-row.armed { background: #00203a; border-left: 3px solid #08f; }
+.digi-msg-row-num { color: #048; font-family: 'Courier New', monospace; font-size: 11px; min-width: 14px; text-align: right; }
+.digi-msg-row-text { color: #ff8; font-family: 'Courier New', monospace; font-size: 12px; flex: 1; }
+.digi-msg-row.armed .digi-msg-row-text { color: #8cf; font-weight: bold; }
+.digi-msg-row-badge { font-family: 'Courier New', monospace; font-size: 10px; color: #048; min-width: 44px; text-align: right; }
+.digi-msg-row.armed .digi-msg-row-badge { color: #08f; }
+
+/* Action row */
+.digi-action-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-bottom: 1px solid #024;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+.digi-field-label {
+    color: #08f;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+}
+.digi-action-btn {
+    padding: 2px 8px;
+    background: #001020;
+    border: 1px solid #048;
+    color: #08f;
+    font-size: 11px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.digi-action-btn:active { background: #048; color: #000; }
+.digi-enable-tx-btn {
+    padding: 2px 8px;
+    background: #001800;
+    border: 1px solid #040;
+    color: #484;
+    font-size: 11px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.digi-enable-tx-btn.active { background: #003000; border-color: #0a0; color: #0f0; }
+.digi-enable-tx-btn:active { background: #080; color: #000; }
+.digi-halt-btn {
+    padding: 2px 8px;
+    background: #1a0000;
+    border: 1px solid #800;
+    color: #f44;
+    font-size: 11px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.digi-halt-btn:active { background: #800; color: #000; }
+.digi-callsign-input {
+    background: #000;
+    border: 1px solid #048;
+    color: #8cf;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 2px 5px;
+    text-transform: uppercase;
+    width: 76px;
+    border-radius: 2px;
+}
+.digi-callsign-input:focus { outline: none; border-color: #08f; background: #000820; }
+.digi-freq-input {
+    background: #000;
+    border: 1px solid #048;
+    color: #8cf;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 2px 5px;
+    width: 58px;
+    border-radius: 2px;
+}
+.digi-freq-input:focus { outline: none; border-color: #08f; background: #000820; }
+.digi-tx-freq-display {
+    font-family: 'Courier New', monospace; font-size: 12px;
+    color: #08f; min-width: 54px; text-align: right;
+    background: #001020; border: 1px solid #048;
+    padding: 2px 5px; border-radius: 2px;
+}
+.digi-rx-freq-display {
+    font-family: 'Courier New', monospace; font-size: 12px;
+    color: #0d8; min-width: 54px; text-align: right;
+    background: #001008; border: 1px solid #082;
+    padding: 2px 5px; border-radius: 2px;
+}
+
+/* Log button in header */
+.digi-log-btn {
+    padding: 2px 7px;
+    background: #001020;
+    border: 1px solid #048;
+    color: #08f;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+.digi-log-btn:active { background: #048; color: #000; }
+
+/* QSO Log Modal */
+.digi-log-modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #000820;
+    border: 2px solid #048;
+    border-radius: 6px;
+    padding: 12px 16px;
+    z-index: 300;
+    width: min(95vw, 720px);
+    max-height: 70vh;
+    flex-direction: column;
+    box-shadow: 0 4px 20px rgba(0,80,160,0.4);
+}
+.digi-log-modal.visible { display: flex; }
+.digi-log-modal-title {
+    display: flex;
+    align-items: center;
+    color: #08f;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: bold;
+    border-bottom: 1px solid #048;
+    padding-bottom: 5px;
+    margin-bottom: 6px;
+}
+.digi-log-modal-title span { flex: 1; }
+.digi-log-scroll {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 80px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+}
+.digi-log-row {
+    display: grid;
+    grid-template-columns: 72px 56px 72px 72px 36px 36px 44px 44px 20px 20px;
+    gap: 3px;
+    padding: 2px 4px;
+    border-bottom: 1px solid #011;
+    color: #5af;
+    align-items: center;
+}
+.digi-log-row.header { color: #448; font-size: 10px; border-bottom: 1px solid #024; padding-top: 0; }
+.digi-log-date { color: #447; }
+.digi-log-time { color: #447; }
+.digi-log-call { color: #8cf; font-weight: bold; }
+.digi-log-freq { color: #5af; }
+.digi-log-band { color: #048; }
+.digi-log-mode { color: #08f; }
+.digi-log-rstsent { color: #5a5; }
+.digi-log-rstrcvd { color: #a55; }
+.digi-log-edit { color: #248; cursor: pointer; font-size: 13px; text-align: center; line-height: 1; }
+.digi-log-edit:hover { color: #08f; }
+.digi-log-save { color: #262; cursor: pointer; font-size: 15px; text-align: center; line-height: 1; }
+.digi-log-save:hover { color: #4f4; }
+.digi-log-del { color: #844; cursor: pointer; font-size: 14px; text-align: center; line-height: 1; }
+.digi-log-del:hover { color: #f44; }
+.digi-log-empty { color: #224; font-style: italic; padding: 8px 4px; }
+.digi-log-input {
+    background: #001828; border: 1px solid #048; color: #8cf;
+    font-family: 'Courier New', monospace; font-size: 10px;
+    width: 100%; box-sizing: border-box; padding: 1px 2px;
+}
+.digi-log-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid #024;
+    flex-wrap: wrap;
+}
+.digi-log-action-btn {
+    padding: 3px 12px;
+    background: #001020;
+    border: 1px solid #048;
+    color: #08f;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+.digi-log-action-btn:active { background: #048; color: #000; }
+.digi-log-action-btn.danger { border-color: #422; color: #844; }
+.digi-log-action-btn.danger:active { background: #422; color: #f44; }
+
+/* Settings modal */
+.digi-settings-modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #000820;
+    border: 2px solid #048;
+    border-radius: 6px;
+    padding: 16px 20px;
+    z-index: 300;
+    min-width: 220px;
+    box-shadow: 0 4px 20px rgba(0,80,160,0.4);
+}
+.digi-settings-modal.visible { display: block; }
+.digi-settings-modal-title {
+    color: #08f;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #048;
+    padding-bottom: 5px;
+}
+.digi-settings-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.digi-settings-close {
+    margin-top: 10px;
+    padding: 4px 16px;
+    background: #001020;
+    border: 1px solid #048;
+    color: #08f;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+}
+.digi-settings-close:active { background: #048; color: #000; }
+
 /* GAIN overlay */
 #gainOverlay.visible {
     flex-direction: column;
@@ -1113,6 +1560,89 @@ html, body {
             <input type="text" id="cwInput" class="cw-input-field" placeholder="TYPE CW MESSAGE..." autocomplete="off">
         </div>
 
+        <!-- DIGI Bar (FT8/FT4 panel) -->
+        <div id="digiBar" class="digi-bar hidden">
+            <div class="digi-bar-header">
+                <span id="digiModeLabel" class="digi-label">FT8</span>
+                <span id="digiClock" class="digi-period-clock">15</span>
+                <span id="digiStatus" class="digi-status">IDLE</span>
+                <select id="digiBandSel" class="digi-band-sel"></select>
+                <label class="digi-cq-label">
+                    <input type="checkbox" id="digiCqOnly"> CQ ONLY
+                </label>
+                <button id="digiSettingsBtn" class="digi-settings-btn" title="Settings">&#9881;</button>
+                <button id="digiLogBtn" class="digi-log-btn" title="QSO Log">Log</button>
+                <button id="digiRxToggle" class="digi-rx-toggle active">RX ON</button>
+                <button id="digiCloseBtn" class="digi-close-btn">&#x2715;</button>
+            </div>
+            <div class="digi-decode-area">
+                <div class="digi-decode-col">
+                    <div class="digi-col-header">All Decodes</div>
+                    <div id="digiRxPanel" class="digi-rx-panel"></div>
+                </div>
+                <div class="digi-decode-col">
+                    <div class="digi-col-header">Directed / Worked</div>
+                    <div id="digiDirectedPanel" class="digi-directed-panel"></div>
+                </div>
+            </div>
+            <div id="digiMsgRows" class="digi-msg-rows"></div>
+            <div class="digi-action-row">
+                <button id="digiLogQsoBtn" class="digi-action-btn">Log QSO</button>
+                <button id="digiEraseBtn" class="digi-action-btn">Erase</button>
+                <button id="digiEnableTxBtn" class="digi-enable-tx-btn">Enable TX</button>
+                <button id="digiHaltBtn" class="digi-halt-btn">Halt TX</button>
+                <span class="digi-field-label">DX:</span>
+                <input type="text" id="digiDxCall" class="digi-callsign-input" maxlength="10" placeholder="DX" autocomplete="off">
+                <span class="digi-field-label">TX:</span>
+                <span id="digiTxFreqDisplay" class="digi-tx-freq-display">1000 Hz</span>
+                <button id="digiHoldTxBtn" class="digi-action-btn">Hold TX Freq</button>
+                <span class="digi-field-label">RX:</span>
+                <span id="digiRxFreqDisplay" class="digi-rx-freq-display">1000 Hz</span>
+            </div>
+        </div>
+
+        <!-- DIGI Settings Modal -->
+        <div id="digiSettingsModal" class="digi-settings-modal">
+            <div class="digi-settings-modal-title">DIGI Settings</div>
+            <div class="digi-settings-field">
+                <span class="digi-field-label">MY CALL:</span>
+                <input type="text" id="digiMyCall" class="digi-callsign-input" maxlength="10" placeholder="CALL" autocomplete="off">
+            </div>
+            <div class="digi-settings-field">
+                <span class="digi-field-label">MY GRID:</span>
+                <input type="text" id="digiGrid" class="digi-callsign-input" maxlength="6" placeholder="AA00" autocomplete="off">
+            </div>
+            <button id="digiSettingsCloseBtn" class="digi-settings-close">Close</button>
+        </div>
+
+        <!-- DIGI Log Modal -->
+        <div id="digiLogModal" class="digi-log-modal">
+            <div class="digi-log-modal-title">
+                <span>QSO Log</span>
+                <button id="digiLogCloseBtn" class="digi-settings-close" style="width:auto;margin:0;padding:2px 12px">&#x2715; Close</button>
+            </div>
+            <div class="digi-log-scroll">
+                <div class="digi-log-row header">
+                    <span class="digi-log-date">Date</span>
+                    <span class="digi-log-time">UTC</span>
+                    <span class="digi-log-call">Call</span>
+                    <span class="digi-log-freq">Freq</span>
+                    <span class="digi-log-band">Band</span>
+                    <span class="digi-log-mode">Mode</span>
+                    <span class="digi-log-rstsent">TX Rpt</span>
+                    <span class="digi-log-rstrcvd">RX Rpt</span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <div id="digiLogRows"></div>
+            </div>
+            <div class="digi-log-actions">
+                <button id="digiAddQsoBtn" class="digi-log-action-btn">&#10010; Add QSO</button>
+                <button id="digiAdifBtn" class="digi-log-action-btn">&#11123; Download ADIF</button>
+                <button id="digiClearLogBtn" class="digi-log-action-btn danger">&#10005; Clear Log</button>
+            </div>
+        </div>
+
         <!-- Macro editor popup -->
         <div id="cwMacroEditor" class="overlay" style="display:none;">
             <div class="editor-dialog">
@@ -1258,6 +1788,53 @@ var swrVal = 1.0;
 
 // Freq input
 var freqInputBuf = '';
+
+// DIGI (FT8/FT4) state
+var digiBarVisible = false;
+var digiMode = 'FT8';
+var digiRxEnabled = true;
+var digiRxBuffer = null;
+var digiRxWritePos = 0;
+var digiRxPhase = 0;
+var lastDecodeSlotIndex = -1; // slot in which decode last fired
+var lastResetSlotIndex = -1;  // slot in which buffer last reset
+var digiPeriodTimer = null;
+var digiTxEnabled = false;
+var digiTxCtx = null; // pre-created from user gesture so it's never suspended
+var digiTxPacerReady = false; // true after first addModule succeeds on digiTxCtx
+var digiTxSlotParity = -1; // 0=even slots, 1=odd slots, -1=unconstrained
+var digiTxQueued = null;
+var digiTxArmed = false;
+var digiTxActive = false; // true while audio is streaming — prevents concurrent TXs
+var digiTxSeq = 0;
+var digiTxAttempts = 0;
+var DIGI_MAX_TX_ATTEMPTS = 5; // retry same message up to 5 times (~75s for FT8)
+var digiDecodes = [];
+var digiDirectedDecodes = [];
+var digiQsoLog = [];
+var digiLogEditIdx = -1; // index of row currently being edited, -1 = none
+var digiHashBook = null;
+var digiQsoState = 'IDLE';
+var digiQsoPartner = '';
+var digiTheirReport = '';  // report they sent us
+var digiOurReport = '';    // report we sent them (for logging)
+var digiCqOnly = false;
+var digiTxFreq = 1000;      // audio TX frequency (Hz) within SSB passband
+var digiRxFreq = 1000;      // audio RX frequency (Hz) — decodes here also appear in Directed
+var digiHoldTxFreq = false; // when true, clicking a row does not change TX freq
+var digiFt8tsReady = false;
+var DIGI_BANDS = [
+    { label: '160m', ft8: 1840000,  ft4: 1844000  },
+    { label: '80m',  ft8: 3573000,  ft4: 3575000  },
+    { label: '40m',  ft8: 7074000,  ft4: 7047000  },
+    { label: '30m',  ft8: 10136000, ft4: 10140000 },
+    { label: '20m',  ft8: 14074000, ft4: 14080000 },
+    { label: '17m',  ft8: 18100000, ft4: 18104000 },
+    { label: '15m',  ft8: 21074000, ft4: 21140000 },
+    { label: '12m',  ft8: 24915000, ft4: 24919000 },
+    { label: '10m',  ft8: 28074000, ft4: 28180000 },
+    { label: '6m',   ft8: 50313000, ft4: 50318000 }
+];
 
 // ============================================================
 // WEBSOCKET (preserved)
@@ -1933,6 +2510,7 @@ function getBottomButtons() {
                 { label: 'BAND', action: function() { setPanel('band'); } },
                 { label: 'FUNC', action: function() { setPanel('func'); } },
                 { label: 'GAIN', action: function() { setPanel('gain'); } },
+                { label: 'DIGI', active: digiBarVisible, action: toggleDigiBar },
                 { label: isCW ? 'KEY' : 'PTT', txActive: isTransmitting, cls: isCW ? 'key-btn' : 'ptt-btn', action: isCW ? toggleCWBar : function() { handlePTTPress(); } }
             ];
         case 'audiomiс':
@@ -2512,6 +3090,7 @@ function handleAudioData(buffer) {
     var pcmData = new Int16Array(buffer, 6);
     var floatData = new Float32Array(pcmData.length);
     for (var i = 0; i < pcmData.length; i++) floatData[i] = pcmData[i] / 32768.0;
+    if (digiRxEnabled && digiRxBuffer) processDigiAudioChunk(pcmData);
 
     if (audioUseWorklet && audioWorkletNode) {
         audioWorkletNode.port.postMessage(floatData);
@@ -3455,6 +4034,1346 @@ function initCWHandlers() {
 }
 
 // ============================================================
+// DIGI (FT8 / FT4)
+// ============================================================
+
+function digiPeriod() { return digiMode === 'FT4' ? 7.5 : 15; }
+function getMyCall() { return ((document.getElementById('digiMyCall') || {}).value || '').toUpperCase(); }
+function getMyGrid() { return ((document.getElementById('digiGrid') || {}).value || 'AA00').toUpperCase(); }
+function getDxCall() { return ((document.getElementById('digiDxCall') || {}).value || '').toUpperCase(); }
+
+// Creates and resumes the shared TX AudioContext during a user gesture.
+// Must be called from button click handlers — never from timers.
+function initDigiTxCtx() {
+    if (digiTxCtx && digiTxCtx.state !== 'closed') return; // already ready
+    digiTxCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: audioSampleRate || 48000 });
+    digiTxPacerReady = false; // new context — processor not yet registered
+    digiTxCtx.resume().then(function() {
+        console.log('[DIGI] TX AudioContext created and running, rate=' + digiTxCtx.sampleRate);
+    }).catch(function(e) {
+        console.warn('[DIGI] TX AudioContext resume failed:', e);
+    });
+}
+
+function toggleDigiBar() {
+    digiBarVisible = !digiBarVisible;
+    var bar = document.getElementById('digiBar');
+    if (digiBarVisible) {
+        bar.classList.remove('hidden');
+        initDigiTxCtx(); // create TX context while we have a user gesture
+        startDigiPeriodTimer();
+        updateDigiMsgRows();
+        updateDigiTxFreqDisplay();
+        updateDigiHoldTxBtn();
+    } else {
+        bar.classList.add('hidden');
+        stopDigiPeriodTimer();
+        digiRxEnabled = false;
+        updateDigiRxToggle();
+        if (digiTxCtx) { digiTxCtx.close(); digiTxCtx = null; digiTxPacerReady = false; }
+    }
+    renderBottomBar();
+}
+
+function stopDigiPeriodTimer() {
+    if (digiPeriodTimer) { clearInterval(digiPeriodTimer); digiPeriodTimer = null; }
+}
+
+function resetDigiRxBuffer() {
+    var len = Math.ceil(digiPeriod() * 12000);
+    digiRxBuffer = new Float32Array(len);
+    digiRxWritePos = 0;
+    digiRxPhase = 0;
+}
+
+function processDigiAudioChunk(int16Chunk) {
+    if (!digiRxBuffer) return;
+    var D = Math.round(audioSampleRate / 12000);
+    if (D < 1) D = 1;
+    for (var i = 0; i < int16Chunk.length; i++) {
+        digiRxPhase++;
+        if (digiRxPhase >= D) {
+            digiRxPhase = 0;
+            if (digiRxWritePos < digiRxBuffer.length) {
+                digiRxBuffer[digiRxWritePos++] = int16Chunk[i] / 32768.0;
+            }
+        }
+    }
+}
+
+function getDigiSlotInfo() {
+    var period = digiPeriod();
+    var now = Date.now() / 1000.0;
+    var utcSec = now % 60;
+    var slotPhase = utcSec % period;
+    var remaining = period - slotPhase;
+    var slotIndex = Math.floor(now / period); // absolute slot counter (ever-increasing)
+    return { slotPhase: slotPhase, remaining: remaining, period: period, slotIndex: slotIndex };
+}
+
+function startDigiPeriodTimer() {
+    stopDigiPeriodTimer();
+    resetDigiRxBuffer();
+    lastDecodeSlotIndex = -1;
+    lastResetSlotIndex = getDigiSlotInfo().slotIndex; // don't re-reset the slot we just reset
+    digiPeriodTimer = setInterval(function() {
+        var info = getDigiSlotInfo();
+        var clockEl = document.getElementById('digiClock');
+        if (clockEl) clockEl.textContent = Math.ceil(info.remaining).toString();
+
+        // Reset buffer on the first timer tick of each new slot.
+        // Using slot index (not a 0.5s window) means this still fires even when the
+        // previous decode blocked the JS thread for 2-3 s and pushed us past the window.
+        if (info.slotIndex !== lastResetSlotIndex) {
+            lastResetSlotIndex = info.slotIndex;
+            resetDigiRxBuffer();
+        }
+        // Trigger decode near end of each slot. Skip while TX is actively streaming
+        // (we'd be capturing our own audio). Armed-but-not-active is fine to decode.
+        if (info.remaining < 0.5 && info.slotIndex !== lastDecodeSlotIndex) {
+            lastDecodeSlotIndex = info.slotIndex;
+            if (digiRxEnabled && !digiTxActive) triggerDigiDecode();
+        }
+        // Fire TX within the first 4.5 s of each slot.
+        // The window is wider than 2 s to survive slow synchronous decodes
+        // (depth:2 can block the main thread for 2-3 s, delaying the timer).
+        // executeDigiTx() clears digiTxArmed only when it is ready to proceed;
+        // if it returns early for any reason, digiTxArmed stays true so the
+        // next timer tick can retry within the same window.
+        if (info.slotPhase < 4.5 && digiTxArmed && !digiTxActive) {
+            var currentParity = info.slotIndex % 2;
+            if (digiTxSlotParity >= 0 && currentParity !== digiTxSlotParity) {
+                // Wrong parity slot — FT8 requires strict alternation with the DX station.
+                // Stay armed and wait for the correct (next) slot.
+            } else {
+                console.log('[DIGI timer] slotPhase=' + info.slotPhase.toFixed(2) +
+                            's parity=' + currentParity + ' armed=true queued=' + JSON.stringify(digiTxQueued) +
+                            ' enabled=' + digiTxEnabled + ' state=' + digiQsoState);
+                executeDigiTx(info.slotPhase);
+            }
+        }
+    }, 100);
+}
+
+function updateDigiRxToggle() {
+    var btn = document.getElementById('digiRxToggle');
+    if (!btn) return;
+    if (digiRxEnabled) {
+        btn.textContent = 'RX ON';
+        btn.classList.add('active');
+    } else {
+        btn.textContent = 'RX OFF';
+        btn.classList.remove('active');
+    }
+}
+
+function updateDigiTxFreqDisplay() {
+    var disp = document.getElementById('digiTxFreqDisplay');
+    if (disp) disp.textContent = digiTxFreq + ' Hz';
+}
+
+function updateDigiRxFreqDisplay() {
+    var disp = document.getElementById('digiRxFreqDisplay');
+    if (disp) disp.textContent = digiRxFreq + ' Hz';
+}
+
+function updateDigiHoldTxBtn() {
+    var btn = document.getElementById('digiHoldTxBtn');
+    if (!btn) return;
+    if (digiHoldTxFreq) {
+        btn.classList.add('active');
+        btn.style.background = '#048';
+        btn.style.color = '#fff';
+    } else {
+        btn.classList.remove('active');
+        btn.style.background = '';
+        btn.style.color = '';
+    }
+}
+
+function updateDigiStatus(text, cls) {
+    var el = document.getElementById('digiStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'digi-status' + (cls ? ' ' + cls : '');
+}
+
+function triggerDigiDecode() {
+    var lib = window.ft8tsLib;
+    if (!lib) { updateDigiStatus('ft8ts not loaded', ''); return; }
+    if (!digiHashBook) { try { digiHashBook = new lib.HashCallBook(); } catch(e) { digiHashBook = null; } }
+    if (digiRxWritePos < 1000) return; // not enough samples
+    // Capture slot index NOW, before the synchronous decode blocks the JS thread
+    // for 2-3 s. After decode returns we may be in a different slot, but the audio
+    // we decoded belongs to the slot we were in when we started.
+    var decodedSlotIndex = getDigiSlotInfo().slotIndex;
+    updateDigiStatus('DECODING', 'decoding');
+    var samples = digiRxBuffer.slice(0, digiRxWritePos);
+    var opts = { sampleRate: 12000, freqLow: 200, freqHigh: 3000, depth: 2 };
+    if (digiHashBook) opts.hashCallBook = digiHashBook;
+    try {
+        var results = (digiMode === 'FT8' ? lib.decodeFT8 : lib.decodeFT4)(samples, opts);
+        var now = new Date();
+        var timeStr = now.toISOString().substr(11, 5);
+        var myCall = getMyCall();
+        for (var i = 0; i < results.length; i++) {
+            var d = { time: timeStr, snr: results[i].snr, dt: results[i].dt,
+                      freq: results[i].freq, msg: results[i].msg,
+                      slotIndex: decodedSlotIndex }; // stored for correct TX-parity calculation
+            digiDecodes.push(d);
+            // Add to directed panel if addressed to us, or transmitting on RX Freq
+            var toUs = myCall && d.msg.toUpperCase().indexOf(myCall) >= 0;
+            var onRxFreq = Math.abs(d.freq - digiRxFreq) <= 10;
+            if (toUs || onRxFreq) {
+                digiDirectedDecodes.push(d);
+                appendDigiDirectedRow(d, false);
+            }
+        }
+        if (digiDecodes.length > 300) digiDecodes.splice(0, digiDecodes.length - 300);
+        renderDigiDecodes();
+        updateDigiStatus('IDLE', '');
+        if (results.length > 0) handleDigiAutoQso(results, decodedSlotIndex);
+    } catch(e) {
+        console.error('[DIGI] decode error:', e);
+        updateDigiStatus('ERR', '');
+    }
+}
+
+function renderDigiDecodes() {
+    var panel = document.getElementById('digiRxPanel');
+    if (!panel) return;
+    var myCall = getMyCall();
+    var cqOnly = (document.getElementById('digiCqOnly') || {}).checked;
+    var html = '';
+    var lastSlotIndex = null;
+    for (var i = 0; i < digiDecodes.length; i++) {
+        var d = digiDecodes[i];
+        var isCq = /^CQ\s/i.test(d.msg) || /\b73\b/.test(d.msg);
+        if (cqOnly && !isCq) continue;
+        // Add slot divider when slot changes
+        if (lastSlotIndex !== null && d.slotIndex !== lastSlotIndex) {
+            html += '<div class="digi-slot-divider"><span class="digi-slot-time">' + escapeHtml(d.time) + '</span></div>';
+        }
+        lastSlotIndex = d.slotIndex;
+        var rparts = d.msg.trim().split(/\s+/);
+        var isDirected = myCall && rparts.length >= 2 && rparts[0].toUpperCase() === myCall.toUpperCase();
+        var isMentioned = !isDirected && myCall && d.msg.toUpperCase().indexOf(myCall) >= 0;
+        var rowCls = 'digi-decode-row' + (isCq ? ' cq-row' : '') + (isDirected ? ' directed' : isMentioned ? ' highlight' : '');
+        var snrStr = (d.snr >= 0 ? '+' : '') + d.snr.toFixed(0);
+        var dtStr  = (d.dt  >= 0 ? '+' : '') + d.dt.toFixed(1);
+        html += '<div class="' + rowCls + '" data-msg="' + encodeURIComponent(d.msg) + '" data-slot="' + (d.slotIndex || 0) + '" data-freq="' + Math.round(d.freq) + '" data-snr="' + d.snr + '" onclick="digiRowClick(this)" ondblclick="digiRowDblClick(this)">' +
+            '<span class="digi-decode-snr">'  + snrStr + '</span>' +
+            '<span class="digi-decode-dt">'   + dtStr  + '</span>' +
+            '<span class="digi-decode-freq">'  + Math.round(d.freq) + '</span>' +
+            '<span class="digi-decode-msg">'   + escapeHtml(d.msg) + '</span>' +
+            '</div>';
+    }
+    panel.innerHTML = html;
+    panel.scrollTop = panel.scrollHeight;
+}
+
+// Unique ID counter for TX rows
+var digiTxRowIdCounter = 0;
+
+function appendDigiTransmittingRow(msg, freq) {
+    var panel = document.getElementById('digiDirectedPanel');
+    if (!panel) return null;
+    var id = 'digi-tx-' + (++digiTxRowIdCounter);
+    var now = new Date();
+    var timeStr = now.toISOString().substr(11, 5);
+    var div = document.createElement('div');
+    div.id = id;
+    div.className = 'digi-decode-row digi-tx-pending';
+    div.setAttribute('data-msg', encodeURIComponent(msg));
+    div.setAttribute('data-freq', Math.round(freq));
+    div.innerHTML =
+        '<span class="digi-decode-snr">...</span>' +
+        '<span class="digi-decode-dt"></span>' +
+        '<span class="digi-decode-freq">' + Math.round(freq) + '</span>' +
+        '<span class="digi-decode-msg">' + escapeHtml(msg) + '</span>';
+    panel.appendChild(div);
+    panel.scrollTop = panel.scrollHeight;
+    return id;
+}
+
+function replaceDigiTransmittingRow(id, d) {
+    var panel = document.getElementById('digiDirectedPanel');
+    if (!panel) return;
+    var oldDiv = document.getElementById(id);
+    if (!oldDiv) {
+        // Fallback: just append as new row
+        appendDigiDirectedRow(d, true);
+        return;
+    }
+    var div = document.createElement('div');
+    div.className = 'digi-decode-row tx-row';
+    div.setAttribute('data-msg', encodeURIComponent(d.msg));
+    div.setAttribute('data-freq', Math.round(d.freq));
+    div.setAttribute('data-snr', d.snr);
+    div.onclick = function() { digiRowClick(this); };
+    div.ondblclick = function() { digiRowDblClick(this); };
+    div.innerHTML =
+        '<span class="digi-decode-snr">TX</span>' +
+        '<span class="digi-decode-dt"></span>' +
+        '<span class="digi-decode-freq"></span>' +
+        '<span class="digi-decode-msg">' + escapeHtml(d.msg) + '</span>';
+    panel.replaceChild(div, oldDiv);
+    panel.scrollTop = panel.scrollHeight;
+}
+
+function appendDigiDirectedRow(d, isTx) {
+    var panel = document.getElementById('digiDirectedPanel');
+    if (!panel) return;
+    var snrStr = isTx ? 'TX' : ((d.snr >= 0 ? '+' : '') + d.snr.toFixed(0));
+    var dtStr  = isTx ? '' : ((d.dt  >= 0 ? '+' : '') + d.dt.toFixed(1));
+    var freqStr = isTx ? '' : Math.round(d.freq).toString();
+    var rowCls = 'digi-decode-row ' + (isTx ? 'tx-row' : 'highlight');
+    var div = document.createElement('div');
+    div.className = rowCls;
+    div.setAttribute('data-msg', encodeURIComponent(d.msg));
+    div.setAttribute('data-freq', Math.round(d.freq));
+    div.setAttribute('data-snr', d.snr);
+    div.setAttribute('data-slot', d.slotIndex || 0);
+    div.onclick = function() { digiRowClick(this); };
+    div.ondblclick = function() { digiRowDblClick(this); };
+    div.innerHTML =
+        '<span class="digi-decode-snr">'   + snrStr  + '</span>' +
+        '<span class="digi-decode-dt">'    + dtStr   + '</span>' +
+        '<span class="digi-decode-freq">'  + freqStr + '</span>' +
+        '<span class="digi-decode-msg">'   + escapeHtml(d.msg) + '</span>';
+    panel.appendChild(div);
+    panel.scrollTop = panel.scrollHeight;
+}
+
+function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function digiRowClick(el) {
+    var msg = decodeURIComponent(el.getAttribute('data-msg') || '');
+    var slotIndex = parseInt(el.getAttribute('data-slot') || '-1', 10);
+    var freq = parseInt(el.getAttribute('data-freq') || '0', 10);
+    var snr = parseFloat(el.getAttribute('data-snr') || '0');
+    var parts = msg.trim().split(/\s+/);
+    var dxEl = document.getElementById('digiDxCall');
+    var myCall = getMyCall();
+    // Set TX and RX frequency to match clicked station (unless Hold is enabled)
+    if (freq >= 200 && freq <= 3000 && !digiHoldTxFreq) {
+        digiTxFreq = freq;
+        digiRxFreq = freq;
+        updateDigiTxFreqDisplay();
+        updateDigiRxFreqDisplay();
+    }
+    if (/^CQ$/i.test(parts[0])) {
+        // CQ <CALL> <GRID> or CQ DX <CALL> <GRID>
+        var cqCall = parts.length >= 3 ? parts[parts.length - 2] : parts[1];
+        if (dxEl) dxEl.value = cqCall.toUpperCase();
+        digiTheirReport = '';
+        digiQsoState = 'IDLE';
+        digiQsoPartner = '';
+        queueDigiCqReply(cqCall, slotIndex);
+    } else if (parts.length >= 2) {
+        // "W1AW W2BIT 73": W2BIT (parts[1]) just signed off and holds the CQ freq — call them.
+        // RR73 is mid-exchange (W1AW hasn't confirmed yet), so skip it.
+        if (parts.length >= 3 && parts[2].toUpperCase() === '73') {
+            var dxCall73 = parts[1].toUpperCase();
+            if (dxEl) dxEl.value = dxCall73;
+            digiQsoPartner = dxCall73;
+            digiQsoState = 'IDLE';
+            digiTheirReport = '';
+            armMessageForQsoState(slotIndex);
+            updateDigiMsgRows();
+            return;
+        }
+        // Non-CQ message. Format: "<TO> <FROM> <DATA>" — FROM (parts[1]) is the transmitter.
+        // We always want to respond to the transmitter, so DX = parts[1].
+        var dxCall = parts[1].toUpperCase();
+        if (dxEl) dxEl.value = dxCall;
+        digiQsoPartner = dxCall;
+        // Message is addressed to us when parts[0] matches MY CALL
+        var msgToMe = myCall && parts[0].toUpperCase() === myCall.toUpperCase();
+        if (msgToMe) {
+            if (/\bRR73\b/i.test(msg) || /\bRRR\b/i.test(msg)) {
+                digiQsoState = 'RRR';
+                digiTheirReport = '';
+            } else if (parts.length >= 3 && /^R[-+]?\d+$/i.test(parts[2])) {
+                // They sent R-report → reply RRR
+                digiQsoState = 'RREPORT';
+                digiTheirReport = '';
+            } else if (parts.length >= 3 && /^[-+]?\d+$/i.test(parts[2])) {
+                // They sent us a signal report → reply with our SNR of their signal
+                digiQsoState = 'REPORT';
+                var roundedSnr = Math.round(snr);
+                digiTheirReport = (roundedSnr >= 0 ? '+' : '') + roundedSnr;
+            } else {
+                digiQsoState = 'REPORT';
+                var roundedSnr2 = Math.round(snr);
+                digiTheirReport = (roundedSnr2 >= 0 ? '+' : '') + roundedSnr2;
+            }
+        } else {
+            // Message not to us — just target that station from IDLE
+            digiQsoState = 'IDLE';
+            digiTheirReport = '';
+        }
+        // Arm appropriate message based on state
+        armMessageForQsoState(slotIndex);
+    }
+    updateDigiMsgRows();
+}
+
+function digiRowDblClick(el) {
+    // Double-click enables TX (if not already enabled)
+    if (!digiTxEnabled) {
+        var btn = document.getElementById('digiEnableTxBtn');
+        if (btn) btn.click();
+    }
+}
+
+function armMessageForQsoState(decodedSlotIndex) {
+    // Arm the appropriate message based on current QSO state
+    var msgs = getDigiMsgTexts();
+    var msgToArm = null;
+    var step = 0;
+    switch (digiQsoState) {
+        case 'IDLE':
+        case 'CALLING':
+            msgToArm = msgs[0]; // Initial call with grid
+            step = 0;
+            break;
+        case 'REPORT':
+            msgToArm = msgs[2]; // R+report (we received report, reply with R-report)
+            step = 2;
+            break;
+        case 'RREPORT':
+            msgToArm = msgs[3]; // RRR (we received R-report, reply with RRR)
+            step = 3;
+            break;
+        case 'RRR':
+            msgToArm = msgs[4]; // 73 (we received RRR, reply with 73)
+            step = 4;
+            break;
+        case 'LOGGED':
+            msgToArm = msgs[4]; // 73
+            step = 4;
+            break;
+    }
+    if (msgToArm && msgToArm !== '\u2014') {
+        digiTxQueued = msgToArm;
+        digiTxAttempts = 0;
+        digiTxArmed = true;
+        // Set parity for next slot
+        var baseSlot = (decodedSlotIndex >= 0) ? decodedSlotIndex : getDigiSlotInfo().slotIndex;
+        digiTxSlotParity = (baseSlot + 1) % 2;
+        console.log('[DIGI] Armed message [' + (step + 1) + ']: "' + msgToArm + '" parity=' + digiTxSlotParity);
+    }
+}
+
+function digiMsgRowClick(step) {
+    if (!digiTxEnabled) {
+        console.warn('[DIGI] msg row clicked but TX not enabled');
+        updateDigiStatus('TX disabled', '');
+        return;
+    }
+    var msgs = getDigiMsgTexts();
+    var msg = msgs[step];
+    if (!msg || msg === '\u2014') { console.warn('[DIGI] msg row ' + (step+1) + ' is empty'); return; }
+    console.log('[DIGI] msg row ' + (step+1) + ' clicked — arming: "' + msg + '"');
+    initDigiTxCtx(); // reinforce running state while we have a user gesture
+    digiTxQueued = msg;
+    digiTxAttempts = 0;
+    digiTxArmed = true;
+    updateDigiMsgRows();
+}
+
+function getDigiMsgTexts() {
+    var myCall = getMyCall() || 'MYCALL';
+    var myGrid = getMyGrid() || 'AA00';
+    var dxCall = getDxCall();
+    // Format report with + for positive values (WSJT-X convention)
+    var rpt = digiTheirReport || '';
+    var rptNum = parseInt(rpt, 10);
+    if (isNaN(rptNum)) rptNum = 0;
+    var report = (rptNum >= 0 ? '+' : '') + rptNum;
+    var dash = '\u2014'; // em-dash placeholder when no DX
+    return [
+        dxCall ? (dxCall + ' ' + myCall + ' ' + myGrid)          : ('CQ ' + myCall + ' ' + myGrid),
+        dxCall ? (dxCall + ' ' + myCall + ' ' + report)          : dash,
+        dxCall ? (dxCall + ' ' + myCall + ' R' + report)         : dash,
+        dxCall ? (dxCall + ' ' + myCall + ' RRR')                : dash,
+        dxCall ? (dxCall + ' ' + myCall + ' 73')                 : dash,
+        'CQ ' + myCall + ' ' + myGrid
+    ];
+}
+
+function updateDigiMsgRows() {
+    var container = document.getElementById('digiMsgRows');
+    if (!container) return;
+    var msgs = getDigiMsgTexts();
+    var html = '';
+    for (var i = 0; i < msgs.length; i++) {
+        var isArmed = digiTxArmed && digiTxQueued === msgs[i];
+        var rowCls = 'digi-msg-row' + (isArmed ? ' armed' : '');
+        html += '<div class="' + rowCls + '" onclick="digiMsgRowClick(' + i + ')">' +
+            '<span class="digi-msg-row-num">' + (i + 1) + '</span>' +
+            '<span class="digi-msg-row-text">' + escapeHtml(msgs[i]) + '</span>' +
+            '<span class="digi-msg-row-badge">' + (isArmed ? '&#9654; NEXT TX' : '') + '</span>' +
+            '</div>';
+    }
+    container.innerHTML = html;
+}
+
+function queueDigiCqReply(dxCall, decodedSlotIndex) {
+    var myCall = getMyCall();
+    var myGrid = getMyGrid();
+    if (!myCall) { console.warn('[DIGI] queueDigiCqReply: MY CALL not set'); return; }
+    var reply = dxCall.toUpperCase() + ' ' + myCall + ' ' + myGrid;
+    digiTxQueued = reply;
+    digiTxAttempts = 0;
+    digiQsoState = 'CALLING';
+    digiQsoPartner = dxCall.toUpperCase();
+    // Use the slot index of when the CQ was DECODED (captured before the blocking
+    // decode call, before JS thread advanced into the next slot). We TX on the slot
+    // OPPOSITE to the CQ sender's slot.
+    var baseSlot = (decodedSlotIndex >= 0) ? decodedSlotIndex : getDigiSlotInfo().slotIndex;
+    digiTxSlotParity = (baseSlot + 1) % 2;
+    if (digiTxEnabled) {
+        digiTxArmed = true;
+        console.log('[DIGI] queueDigiCqReply: armed (parity ' + digiTxSlotParity + ') "' + reply + '"');
+    } else {
+        console.log('[DIGI] queueDigiCqReply: queued "' + reply + '" (TX not enabled yet)');
+    }
+    updateDigiMsgRows();
+}
+
+// decodedSlotIndex: the slot in which the audio was decoded (captured before the
+// blocking ft8ts call so it reflects the correct slot, not "current time + 2.5s").
+function handleDigiAutoQso(decodes, decodedSlotIndex) {
+    var myCall = getMyCall();
+    var myGrid = getMyGrid();
+    if (!myCall) return;
+
+    for (var i = 0; i < decodes.length; i++) {
+        var msg = decodes[i].msg.trim().toUpperCase();
+        var parts = msg.split(/\s+/);
+        // Each decode's slot index (prefer per-decode if present, fall back to argument)
+        var dSlot = (decodes[i].slotIndex !== undefined) ? decodes[i].slotIndex : decodedSlotIndex;
+
+        if (digiQsoState === 'IDLE') {
+            // Look for CQ <CALL> <GRID> — only auto-arm if the user has already
+            // targeted this specific station in the DX field. Never auto-select
+            // random CQ callers; the user must click a decode row to start a QSO.
+            if (/^CQ/.test(msg) && parts.length >= 2) {
+                var cqCall = parts[parts.length - 2] || parts[1];
+                var userDx = getDxCall();
+                if (cqCall && cqCall !== myCall && userDx && userDx === cqCall) {
+                    console.log('[DIGI QSO] IDLE→CALLING: targeted station ' + cqCall + ' sent CQ');
+                    digiQsoPartner = cqCall;
+                    digiTxAttempts = 0;
+                    digiTxQueued = cqCall + ' ' + myCall + ' ' + myGrid;
+                    digiTxSlotParity = (dSlot + 1) % 2; // TX on slot OPPOSITE to CQ slot
+                    if (digiTxEnabled) { digiTxArmed = true; console.log('[DIGI QSO] armed (parity ' + digiTxSlotParity + '): ' + digiTxQueued); }
+                    else { console.log('[DIGI QSO] TX disabled — queued but not armed: ' + digiTxQueued); }
+                    digiQsoState = 'CALLING';
+                    break;
+                }
+            }
+        } else if (digiQsoState === 'CALLING') {
+            // Look for <MY> <PARTNER> ±NN (their report of our signal)
+            if (parts[0] === myCall && parts[1] === digiQsoPartner && parts.length >= 3) {
+                console.log('[DIGI QSO] CALLING→EXCHANGE: received report ' + parts[2] + ' from ' + digiQsoPartner);
+                // Preserve their report to us
+                digiTheirReport = parts[2];
+                // Our reply uses OUR SNR (how well we received them), not their report
+                var ourSnr = decodes[i].snr;
+                digiOurReport = (ourSnr >= 0 ? '+' : '') + Math.round(ourSnr);
+                digiTxAttempts = 0;
+                digiTxQueued = digiQsoPartner + ' ' + myCall + ' R' + digiOurReport;
+                digiTxSlotParity = (dSlot + 1) % 2; // TX on slot OPPOSITE to their slot
+                if (digiTxEnabled) { digiTxArmed = true; console.log('[DIGI QSO] armed (parity ' + digiTxSlotParity + '): ' + digiTxQueued); }
+                else { console.log('[DIGI QSO] TX disabled — queued but not armed: ' + digiTxQueued); }
+                digiQsoState = 'EXCHANGE';
+                break;
+            } else if (parts[0] === digiQsoPartner && parts.length >= 2 && parts[1] !== myCall) {
+                // DX station replied to someone else — desist and disable TX
+                console.log('[DIGI QSO] CALLING→IDLE: ' + digiQsoPartner + ' replied to ' + parts[1] + ', not us — disabling TX');
+                digiTxArmed = false;
+                digiTxActive = false;
+                digiTxQueued = null;
+                digiTxEnabled = false;
+                digiTxAttempts = 0;
+                digiTxSlotParity = -1;
+                digiQsoState = 'IDLE';
+                digiQsoPartner = '';
+                digiTheirReport = '';
+                var etb = document.getElementById('digiEnableTxBtn');
+                if (etb) etb.classList.remove('active');
+                send({ cmd: 'setPTT', value: false });
+                updateDigiStatus('IDLE', '');
+                updateDigiMsgRows();
+                break;
+            }
+        } else if (digiQsoState === 'EXCHANGE') {
+            // Look for <MY> <PARTNER> RR73 / RRR
+            if (parts[0] === myCall && parts[1] === digiQsoPartner &&
+                (parts[2] === 'RR73' || parts[2] === 'RRR')) {
+                console.log('[DIGI QSO] EXCHANGE→LOGGED: received ' + parts[2]);
+                digiTxAttempts = 0;
+                digiTxQueued = digiQsoPartner + ' ' + myCall + ' 73';
+                digiTxSlotParity = (dSlot + 1) % 2; // TX on slot OPPOSITE to their slot
+                if (digiTxEnabled) { digiTxArmed = true; console.log('[DIGI QSO] armed (parity ' + digiTxSlotParity + '): ' + digiTxQueued); }
+                else { console.log('[DIGI QSO] TX disabled — queued but not armed: ' + digiTxQueued); }
+                digiQsoState = 'LOGGED';
+                // Log using the report we sent them (digiOurReport), not the decode SNR
+                var logReport = parseInt(digiOurReport, 10) || 0;
+                logDigiQso(digiQsoPartner, logReport);
+                break;
+            }
+        } else if (digiQsoState === 'LOGGED') {
+            // LOGGED state: 73 is queued and will be sent. Don't transition to IDLE
+            // here — let onDone do it after the 73 is actually transmitted.
+            // Just stop processing further decodes this cycle.
+            break;
+        }
+    }
+    updateDigiMsgRows();
+}
+
+function executeDigiTx(slotPhase) {
+    console.log('[DIGI TX] executeDigiTx: enabled=' + digiTxEnabled +
+                ' queued=' + JSON.stringify(digiTxQueued) +
+                ' lib=' + (window.ft8tsLib ? 'yes' : 'NO') +
+                ' attempts=' + digiTxAttempts + '/' + DIGI_MAX_TX_ATTEMPTS +
+                ' state=' + digiQsoState);
+
+    if (!digiTxEnabled) { console.warn('[DIGI TX] TX not enabled — skipping'); return; }
+    if (digiTxActive) { console.warn('[DIGI TX] TX already active — skipping (will retry next slot)'); return; }
+    var lib = window.ft8tsLib;
+    if (!lib) { console.warn('[DIGI TX] ft8tsLib not loaded — skipping'); return; }
+    var msg = digiTxQueued;
+    if (!msg || !msg.trim()) { console.warn('[DIGI TX] no message queued — skipping'); return; }
+
+    // Commit: clear armed flag now that we are actually proceeding
+    digiTxArmed = false;
+    digiTxActive = true;
+
+    var df = (digiTxFreq >= 200 && digiTxFreq <= 3000) ? digiTxFreq : 1000;
+    var txMsg = msg.trim().toUpperCase();
+
+    console.log('[DIGI TX] encoding "' + txMsg + '" mode=' + digiMode + ' df=' + df);
+    try {
+        var samples12k = (digiMode === 'FT8' ? lib.encodeFT8 : lib.encodeFT4)(
+            txMsg, { sampleRate: 12000, baseFrequency: df }
+        );
+
+        // Calculate sample skip based on how late we are in the slot
+        // Skip samples from the beginning to maintain end-of-slot sync
+        var sampleRate = 12000;
+        var skipSamples = 0;
+        if (slotPhase && slotPhase > 0) {
+            skipSamples = Math.floor(slotPhase * sampleRate);
+            // Ensure we don't skip more than we have
+            if (skipSamples >= samples12k.length) {
+                console.warn('[DIGI TX] slotPhase=' + slotPhase.toFixed(2) + 's too late, would skip all samples');
+                skipSamples = Math.floor(samples12k.length * 0.9); // Keep at least 10%
+            }
+        }
+
+        if (skipSamples > 0) {
+            samples12k = samples12k.slice(skipSamples);
+            console.log('[DIGI TX] encoded ' + (samples12k.length + skipSamples) + ' samples, skipping ' + skipSamples +
+                        ' (slotPhase=' + slotPhase.toFixed(2) + 's), streaming ' + samples12k.length + ' samples');
+        } else {
+            console.log('[DIGI TX] encoded ' + samples12k.length + ' samples @12kHz, starting stream');
+        }
+        updateDigiStatus('TX', 'tx');
+        send({ cmd: 'enableMic', value: true });
+
+        // Capture df/txMsg for the closures below
+        var txDf = df;
+        var txMsgCapture = txMsg;
+
+        // Add "transmitting" indicator row (greyed out)
+        var txRowId = appendDigiTransmittingRow(txMsg, txDf);
+
+        streamDigiAudio(samples12k, function() {
+            // onDone: all audio sent to server; release transmitter
+            digiTxActive = false;
+            send({ cmd: 'setPTT', value: false });
+            send({ cmd: 'enableMic', value: false });
+            console.log('[DIGI TX] PTT OFF — TX complete');
+
+            // Replace transmitting indicator with completed TX row
+            var now = new Date();
+            var timeStr = now.toISOString().substr(11, 5);
+            replaceDigiTransmittingRow(txRowId, { time: timeStr, snr: 0, dt: 0, freq: txDf, msg: txMsgCapture });
+
+            digiTxAttempts++;
+            console.log('[DIGI TX] onDone: attempt ' + digiTxAttempts + '/' + DIGI_MAX_TX_ATTEMPTS +
+                        ' state=' + digiQsoState);
+
+            if (digiQsoState === 'LOGGED') {
+                // QSO complete — full reset so no automatic restart
+                digiQsoState = 'IDLE';
+                digiQsoPartner = '';
+                digiTheirReport = '';
+                digiTxQueued = null;
+                digiTxAttempts = 0;
+                digiTxSlotParity = -1;
+                digiTxEnabled = false;
+                var etb = document.getElementById('digiEnableTxBtn');
+                if (etb) etb.classList.remove('active');
+                var dxEl = document.getElementById('digiDxCall');
+                if (dxEl) dxEl.value = '';
+                updateDigiStatus('QSO DONE', '');
+            } else if (digiTxEnabled && digiTxQueued && digiTxAttempts < DIGI_MAX_TX_ATTEMPTS) {
+                // No reply yet — re-arm the same message for the next TX slot
+                console.log('[DIGI TX] re-arming attempt ' + (digiTxAttempts + 1) +
+                            '/' + DIGI_MAX_TX_ATTEMPTS + ': "' + digiTxQueued + '"');
+                updateDigiStatus('WAIT RX', '');
+                digiTxArmed = true;
+            } else {
+                if (digiTxAttempts >= DIGI_MAX_TX_ATTEMPTS) {
+                    console.warn('[DIGI TX] max attempts reached — giving up');
+                    updateDigiStatus('NO REPLY', '');
+                } else {
+                    updateDigiStatus('IDLE', '');
+                }
+                digiTxQueued = null;
+                digiTxAttempts = 0;
+            }
+            updateDigiMsgRows();
+        }, function() {
+            // onFirstChunk: ~100 ms of audio buffered in ALSA — safe to key TX
+            console.log('[DIGI TX] PTT ON for: "' + txMsgCapture + '"');
+            send({ cmd: 'setPTT', value: true });
+        });
+    } catch(e) {
+        console.error('[DIGI TX] encode/stream error:', e);
+        updateDigiStatus('ERR', '');
+        digiTxArmed = false;
+        digiTxActive = false;
+    }
+}
+
+function streamDigiAudio(samples12k, onDone, onFirstChunk) {
+    console.log('[DIGI stream] start: samples12k.length=' + samples12k.length +
+                ' audioSampleRate=' + audioSampleRate +
+                ' ws=' + (ws ? ws.readyState : 'null'));
+    // Reuse the pre-created AudioContext that was resumed during a user gesture.
+    // Creating a new AudioContext from a setInterval callback produces a suspended
+    // context that can never be resumed (browser blocks resume() without user gesture).
+    var txCtx = digiTxCtx;
+    if (!txCtx || txCtx.state === 'closed') {
+        console.warn('[DIGI stream] digiTxCtx not ready (state=' +
+                     (txCtx ? txCtx.state : 'null') + ') — aborting TX');
+        digiTxActive = false;
+        if (onDone) onDone();
+        return;
+    }
+    var actualRate = txCtx.sampleRate;
+    console.log('[DIGI stream] AudioContext actualRate=' + actualRate + ' state=' + txCtx.state);
+
+    // Upsample 12 kHz Float32 → actualRate Float32
+    var ratio = actualRate / 12000;
+    var outLen = Math.floor(samples12k.length * ratio);
+    var out48 = new Float32Array(outLen);
+    for (var i = 0; i < outLen; i++) {
+        var srcPos = i / ratio;
+        var srcIdx = Math.floor(srcPos);
+        var frac = srcPos - srcIdx;
+        var s0 = samples12k[srcIdx] || 0;
+        var s1 = samples12k[Math.min(srcIdx + 1, samples12k.length - 1)] || 0;
+        out48[i] = s0 + frac * (s1 - s0);
+    }
+
+    var seq = digiTxSeq;
+    var chunksSent = 0;
+    // Fire PTT after ~100 ms of audio is in the ALSA buffer (≈9 batches of 512 samples
+    // at 48 kHz = 96 ms) so ALSA has enough cushion to survive brief main-thread stalls.
+    var PTT_AFTER_CHUNKS = 9;
+
+    function sendInt16Chunk(i16buf) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            console.warn('[DIGI stream] sendInt16Chunk: WS not open (state=' +
+                         (ws ? ws.readyState : 'null') + ') chunk#' + (chunksSent + 1));
+            return;
+        }
+        var frame = new ArrayBuffer(6 + i16buf.byteLength);
+        var dv = new DataView(frame);
+        dv.setUint8(0, 0x03); dv.setUint8(1, 0x00);
+        dv.setUint16(2, (seq++) & 0xFFFF, true);
+        dv.setUint16(4, 0, true);
+        new Uint8Array(frame, 6).set(new Uint8Array(i16buf));
+        ws.send(frame);
+        chunksSent++;
+        if (chunksSent === 1) console.log('[DIGI stream] first chunk sent (' + i16buf.byteLength + ' bytes)');
+        if (chunksSent === PTT_AFTER_CHUNKS) {
+            console.log('[DIGI stream] PTT trigger threshold reached (' + chunksSent + ' chunks)');
+            if (onFirstChunk) onFirstChunk();
+        }
+    }
+
+    // Each AudioWorklet quantum = 128 samples at the hardware clock rate.
+    // process() fires at exactly that cadence, matching ALSA's drain rate.
+    // IMPORTANT: process() MUST write to outputs[0][0] on every call — even silence —
+    // or browsers apply "tail-time" optimisation and stop calling process() early,
+    // cutting the transmission short and causing an ALSA underrun.
+    var pacerCode = [
+        'class DigiPacer extends AudioWorkletProcessor {',
+        '  constructor() {',
+        '    super();',
+        '    this.buf = null; this.pos = 0; this.accStart = 0;',
+        '    this.port.onmessage = function(e) {',
+        '      this.buf = new Float32Array(e.data); this.pos = 0; this.accStart = 0;',
+        '    }.bind(this);',
+        '  }',
+        '  process(inputs, outputs) {',
+        '    var QUANTUM = 128;',
+        '    var BATCH = 512;',
+        '    var out = outputs[0] && outputs[0][0];',
+        '    if (!this.buf || this.pos >= this.buf.length) {',
+        '      if (out) { for (var z=0; z<QUANTUM; z++) out[z]=0; }',
+        '      return true;',
+        '    }',
+        '    var end = Math.min(this.pos + QUANTUM, this.buf.length);',
+        '    if (out) {',
+        '      for (var i=0, j=this.pos; j<end; i++, j++) out[i] = this.buf[j];',
+        '      for (; i<QUANTUM; i++) out[i] = 0;',
+        '    }',
+        '    this.pos = end;',
+        '    var isDone = this.pos >= this.buf.length;',
+        '    if ((this.pos - this.accStart) >= BATCH || isDone) {',
+        '      var chunk = this.buf.subarray(this.accStart, this.pos);',
+        '      var i16 = new Int16Array(chunk.length);',
+        '      for (var k=0; k<chunk.length; k++) {',
+        '        var v = chunk[k]<-1?-1:chunk[k]>1?1:chunk[k];',
+        '        i16[k] = (v<0?v*32768:v*32767)|0;',
+        '      }',
+        '      this.port.postMessage(i16.buffer, [i16.buffer]);',
+        '      this.accStart = this.pos;',
+        '    }',
+        '    if (isDone) this.port.postMessage("done");',
+        '    return true;',
+        '  }',
+        '}',
+        'registerProcessor("digi-pacer", DigiPacer);'
+    ].join('\n');
+
+    // Node setup — called once the processor is registered in txCtx.
+    function startPacerNode() {
+        console.log('[DIGI stream] starting pacer node, ctxState=' + txCtx.state + ' outLen=' + outLen + ' samples');
+        // outputChannelCount: [1] ensures outputs[0][0] is always a real Float32Array.
+        // Without it, browsers may give 0 channels and immediately apply tail-time
+        // optimisation (stopping process() calls) because they see no output written.
+        var node = new AudioWorkletNode(txCtx, 'digi-pacer', { outputChannelCount: [1] });
+        // AnalyserNode is always an active consumer — it keeps the audio graph running
+        // without routing audio to the speakers. A muted GainNode risks being optimised
+        // away by the browser because it produces no perceptible output.
+        var sink = txCtx.createAnalyser();
+        node.connect(sink);
+
+        node.port.onmessage = function(e) {
+            if (e.data === 'done') {
+                console.log('[DIGI stream] worklet done, chunksSent=' + chunksSent);
+                node.disconnect();
+                // Do NOT close txCtx — it is the shared digiTxCtx, kept alive for next TX
+                digiTxSeq = seq;
+                setTimeout(function() { if (onDone) onDone(); }, 200);
+                return;
+            }
+            sendInt16Chunk(e.data);
+        };
+
+        // Transfer the Float32 buffer into the worklet — zero copy
+        node.port.postMessage(out48.buffer, [out48.buffer]);
+    }
+
+    if (digiTxPacerReady) {
+        // Processor already registered in this AudioContext — skip addModule.
+        // Calling registerProcessor() twice on the same context throws InvalidStateError.
+        startPacerNode();
+    } else {
+        var blob = new Blob([pacerCode], { type: 'application/javascript' });
+        var blobUrl = URL.createObjectURL(blob);
+        txCtx.audioWorklet.addModule(blobUrl).then(function() {
+            URL.revokeObjectURL(blobUrl);
+            console.log('[DIGI stream] AudioWorklet loaded, ctxState=' + txCtx.state);
+            digiTxPacerReady = true;
+            startPacerNode();
+        }).catch(function(err) {
+            URL.revokeObjectURL(blobUrl);
+            // Do NOT close txCtx — it is the shared digiTxCtx, kept alive for next TX
+            // Fallback for non-secure context: rAF + elapsed-time tracking
+            console.warn('[DIGI] AudioWorklet unavailable, using rAF fallback:', err);
+            var pos = 0;
+            var startTs = null;
+            function rafTick(ts) {
+                if (startTs === null) startTs = ts;
+                var target = Math.floor((ts - startTs) / 1000 * audioSampleRate);
+                var toSend = Math.min(target - pos, out48.length - pos);
+                if (toSend > 0) {
+                    var floatChunk = out48.subarray(pos, pos + toSend);
+                    var i16 = new Int16Array(floatChunk.length);
+                    for (var i = 0; i < floatChunk.length; i++) {
+                        var v = Math.max(-1, Math.min(1, floatChunk[i]));
+                        i16[i] = (v < 0 ? v * 32768 : v * 32767) | 0;
+                    }
+                    sendInt16Chunk(i16.buffer);
+                    pos += toSend;
+                }
+                if (pos < out48.length) { requestAnimationFrame(rafTick); }
+                else { digiTxSeq = seq; setTimeout(function() { if (onDone) onDone(); }, 200); }
+            }
+            requestAnimationFrame(rafTick);
+        });
+    }
+}
+
+function freqToBand(hz) {
+    if (hz >= 1800000 && hz < 2000000) return '160M';
+    if (hz >= 3500000 && hz < 4000000) return '80M';
+    if (hz >= 7000000 && hz < 7300000) return '40M';
+    if (hz >= 10100000 && hz < 10150000) return '30M';
+    if (hz >= 14000000 && hz < 14350000) return '20M';
+    if (hz >= 18068000 && hz < 18168000) return '17M';
+    if (hz >= 21000000 && hz < 21450000) return '15M';
+    if (hz >= 24890000 && hz < 24990000) return '12M';
+    if (hz >= 28000000 && hz < 29700000) return '10M';
+    if (hz >= 50000000 && hz < 54000000) return '6M';
+    return '';
+}
+
+function logDigiQso(dxCall, rstSent) {
+    var now = new Date();
+    var iso = now.toISOString();
+    var freqHz = (vfoAFreq || currentFreq || 0);
+    var df = (digiTxFreq >= 200 && digiTxFreq <= 3000) ? digiTxFreq : 0;
+    var entry = {
+        date: iso.substr(0, 10).replace(/-/g, ''),  // YYYYMMDD
+        time: iso.substr(11, 8).replace(/:/g, ''),   // HHMMSS
+        call: dxCall.toUpperCase(),
+        freq: freqHz,
+        band: freqToBand(freqHz),
+        mode: digiMode,
+        df:   df,
+        grid: ((document.getElementById('digiGrid') || {}).value || '').toUpperCase(),
+        rstSent: (rstSent !== undefined && rstSent !== null) ?
+                 ((rstSent >= 0 ? '+' : '') + Math.round(rstSent)) : '',
+        rstRcvd: digiTheirReport || ''
+    };
+    digiQsoLog.unshift(entry);
+    try { localStorage.setItem('digiQsoLog', JSON.stringify(digiQsoLog.slice(0, 500))); } catch(e) {}
+    renderDigiLog();
+}
+
+function renderDigiLog() {
+    var panel = document.getElementById('digiLogRows');
+    if (!panel) return;
+    if (!digiQsoLog.length) {
+        panel.innerHTML = '<div class="digi-log-empty">No QSOs logged yet.</div>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < digiQsoLog.length; i++) {
+        var q = digiQsoLog[i];
+        var dateDisp = q.date ? q.date.substr(0,4)+'-'+q.date.substr(4,2)+'-'+q.date.substr(6,2) : '';
+        var timeDisp = q.time ? q.time.substr(0,2)+':'+q.time.substr(2,2) : (q.time || '');
+        var freqDisp = q.freq ? (q.freq / 1e6).toFixed(3) : '';
+        if (i === digiLogEditIdx) {
+            // Editable row
+            html += '<div class="digi-log-row">' +
+                '<input class="digi-log-input" id="dleDate" value="' + escapeHtml(dateDisp) + '">' +
+                '<input class="digi-log-input" id="dleTime" value="' + escapeHtml(timeDisp) + '">' +
+                '<input class="digi-log-input" id="dleCall" value="' + escapeHtml(q.call || '') + '">' +
+                '<input class="digi-log-input" id="dleFreq" value="' + escapeHtml(freqDisp) + '">' +
+                '<input class="digi-log-input" id="dleBand" value="' + escapeHtml(q.band || '') + '">' +
+                '<input class="digi-log-input" id="dleMode" value="' + escapeHtml(q.mode || '') + '">' +
+                '<input class="digi-log-input" id="dleRstSent" value="' + escapeHtml(q.rstSent || '') + '">' +
+                '<input class="digi-log-input" id="dleRstRcvd" value="' + escapeHtml(q.rstRcvd || '') + '">' +
+                '<span class="digi-log-save" title="Save" onclick="saveDigiQso(' + i + ')">&#x2713;</span>' +
+                '<span class="digi-log-del" title="Cancel" onclick="cancelEditDigiQso()">&#x2715;</span>' +
+                '</div>';
+        } else {
+            var rstSentDisp = q.rstSent !== undefined ? q.rstSent : (q.snr !== undefined ? ((q.snr>=0?'+':'')+Math.round(q.snr)) : '');
+            html += '<div class="digi-log-row">' +
+                '<span class="digi-log-date">' + escapeHtml(dateDisp) + '</span>' +
+                '<span class="digi-log-time">' + escapeHtml(timeDisp) + '</span>' +
+                '<span class="digi-log-call">' + escapeHtml(q.call || '') + '</span>' +
+                '<span class="digi-log-freq">' + escapeHtml(freqDisp) + '</span>' +
+                '<span class="digi-log-band">' + escapeHtml(q.band || '') + '</span>' +
+                '<span class="digi-log-mode">' + escapeHtml(q.mode || '') + '</span>' +
+                '<span class="digi-log-rstsent">' + escapeHtml(rstSentDisp) + '</span>' +
+                '<span class="digi-log-rstrcvd">' + escapeHtml(q.rstRcvd || '') + '</span>' +
+                '<span class="digi-log-edit" title="Edit" onclick="editDigiQso(' + i + ')">&#x270E;</span>' +
+                '<span class="digi-log-del" title="Delete" onclick="deleteDigiQso(' + i + ')">&#x2715;</span>' +
+                '</div>';
+        }
+    }
+    panel.innerHTML = html;
+}
+
+function editDigiQso(idx) {
+    digiLogEditIdx = idx;
+    renderDigiLog();
+    // Focus the callsign field for convenience
+    var el = document.getElementById('dleCall');
+    if (el) el.focus();
+}
+
+function cancelEditDigiQso() {
+    // If we were editing a blank new entry, remove it
+    if (digiLogEditIdx >= 0 && digiQsoLog[digiLogEditIdx] && !digiQsoLog[digiLogEditIdx].call) {
+        digiQsoLog.splice(digiLogEditIdx, 1);
+        try { localStorage.setItem('digiQsoLog', JSON.stringify(digiQsoLog.slice(0, 500))); } catch(e) {}
+    }
+    digiLogEditIdx = -1;
+    renderDigiLog();
+}
+
+function saveDigiQso(idx) {
+    var q = digiQsoLog[idx];
+    if (!q) return;
+    var dateVal   = (document.getElementById('dleDate')    || {}).value || '';
+    var timeVal   = (document.getElementById('dleTime')    || {}).value || '';
+    var callVal   = (document.getElementById('dleCall')    || {}).value || '';
+    var freqVal   = (document.getElementById('dleFreq')    || {}).value || '';
+    var bandVal   = (document.getElementById('dleBand')    || {}).value || '';
+    var modeVal   = (document.getElementById('dleMode')    || {}).value || '';
+    var rstSent   = (document.getElementById('dleRstSent') || {}).value || '';
+    var rstRcvd   = (document.getElementById('dleRstRcvd') || {}).value || '';
+    // YYYY-MM-DD → YYYYMMDD; allow plain YYYYMMDD too
+    q.date    = dateVal.replace(/-/g, '').substr(0, 8);
+    // HH:MM or HH:MM:SS → HHMMSS
+    q.time    = timeVal.replace(/:/g, '').substr(0, 6);
+    if (q.time.length === 4) q.time += '00';
+    q.call    = callVal.toUpperCase();
+    q.freq    = freqVal ? Math.round(parseFloat(freqVal) * 1e6) : (q.freq || 0);
+    q.band    = bandVal.toUpperCase() || freqToBand(q.freq);
+    q.mode    = modeVal.toUpperCase();
+    q.rstSent = rstSent;
+    q.rstRcvd = rstRcvd;
+    digiLogEditIdx = -1;
+    try { localStorage.setItem('digiQsoLog', JSON.stringify(digiQsoLog.slice(0, 500))); } catch(e) {}
+    renderDigiLog();
+}
+
+function addDigiQso() {
+    var now = new Date();
+    var iso = now.toISOString();
+    var freqHz = (vfoAFreq || currentFreq || 0);
+    var entry = {
+        date: iso.substr(0, 10).replace(/-/g, ''),
+        time: iso.substr(11, 8).replace(/:/g, ''),
+        call: '',
+        freq: freqHz,
+        band: freqToBand(freqHz),
+        mode: digiMode,
+        df: 0,
+        grid: ((document.getElementById('digiGrid') || {}).value || '').toUpperCase(),
+        rstSent: '',
+        rstRcvd: ''
+    };
+    digiQsoLog.unshift(entry);
+    digiLogEditIdx = 0;
+    renderDigiLog();
+    var el = document.getElementById('dleCall');
+    if (el) el.focus();
+}
+
+function deleteDigiQso(idx) {
+    if (digiLogEditIdx === idx) digiLogEditIdx = -1;
+    else if (digiLogEditIdx > idx) digiLogEditIdx--;
+    digiQsoLog.splice(idx, 1);
+    try { localStorage.setItem('digiQsoLog', JSON.stringify(digiQsoLog.slice(0, 500))); } catch(e) {}
+    renderDigiLog();
+}
+
+function downloadAdif() {
+    function adifField(tag, val) {
+        if (!val) return '';
+        var s = String(val);
+        return '<' + tag + ':' + s.length + '>' + s + ' ';
+    }
+    var lines = ['ADIF Export from wfweb\n<EOH>\n'];
+    for (var i = digiQsoLog.length - 1; i >= 0; i--) {
+        var q = digiQsoLog[i];
+        var freqMHz = q.freq ? (q.freq / 1e6).toFixed(6) : '';
+        lines.push(
+            adifField('CALL', q.call) +
+            adifField('QSO_DATE', q.date) +
+            adifField('TIME_ON', q.time) +
+            adifField('FREQ', freqMHz) +
+            adifField('BAND', q.band) +
+            adifField('MODE', q.mode) +
+            adifField('RST_SENT', q.rstSent) +
+            adifField('RST_RCVD', q.rstRcvd) +
+            adifField('MY_GRIDSQUARE', q.grid) +
+            '<EOR>\n'
+        );
+    }
+    var now = new Date();
+    var iso = now.toISOString();
+    var ts = iso.substr(0, 10).replace(/-/g, '') + '_' + iso.substr(11, 8).replace(/:/g, '');
+    var myCall = ((document.getElementById('digiMyCall') || {}).value || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'LOG';
+    var filename = 'wfweb_' + myCall + '_' + ts + '.adi';
+    var blob = new Blob([lines.join('')], { type: 'text/plain' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function clearDigiLog() {
+    if (!digiQsoLog.length) { alert('Log is already empty.'); return; }
+    if (confirm('Download the log as ADIF before clearing?')) { downloadAdif(); }
+    if (confirm('Clear all ' + digiQsoLog.length + ' logged QSO(s)?')) {
+        digiQsoLog = [];
+        try { localStorage.removeItem('digiQsoLog'); } catch(e) {}
+        renderDigiLog();
+    }
+}
+
+function initDigiHandlers() {
+    // Populate band selector
+    var bandSel = document.getElementById('digiBandSel');
+    if (bandSel) {
+        var opt0 = document.createElement('option');
+        opt0.value = ''; opt0.textContent = 'Band';
+        bandSel.appendChild(opt0);
+        for (var b = 0; b < DIGI_BANDS.length; b++) {
+            var opt = document.createElement('option');
+            opt.value = DIGI_BANDS[b].label;
+            opt.textContent = DIGI_BANDS[b].label;
+            bandSel.appendChild(opt);
+        }
+        bandSel.addEventListener('change', function() {
+            var sel = this.value;
+            for (var bi = 0; bi < DIGI_BANDS.length; bi++) {
+                if (DIGI_BANDS[bi].label === sel) {
+                    var freq = digiMode === 'FT4' ? DIGI_BANDS[bi].ft4 : DIGI_BANDS[bi].ft8;
+                    send({ cmd: 'setFrequency', value: freq });
+                    break;
+                }
+            }
+        });
+    }
+
+    // Load persisted settings
+    var savedCall = localStorage.getItem('digiMyCall');
+    var savedGrid = localStorage.getItem('digiGrid');
+    var savedLog  = localStorage.getItem('digiQsoLog');
+    var myCallEl = document.getElementById('digiMyCall');
+    var gridEl = document.getElementById('digiGrid');
+    if (savedCall && myCallEl) myCallEl.value = savedCall;
+    if (savedGrid && gridEl) gridEl.value = savedGrid;
+    if (savedLog) { try { digiQsoLog = JSON.parse(savedLog); renderDigiLog(); } catch(e) {} }
+
+    // Persist MY call and grid on change; rebuild msg rows on change
+    if (myCallEl) {
+        myCallEl.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+            try { localStorage.setItem('digiMyCall', this.value); } catch(e) {}
+            updateDigiMsgRows();
+        });
+    }
+    if (gridEl) {
+        gridEl.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+            try { localStorage.setItem('digiGrid', this.value); } catch(e) {}
+            updateDigiMsgRows();
+        });
+    }
+
+    // DX call — rebuild msg rows when changed
+    var dxEl = document.getElementById('digiDxCall');
+    if (dxEl) {
+        dxEl.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+            updateDigiMsgRows();
+        });
+    }
+
+    // Mode label click — toggle FT8 ↔ FT4
+    var modeLabel = document.getElementById('digiModeLabel');
+    if (modeLabel) {
+        modeLabel.addEventListener('click', function() {
+            digiMode = (digiMode === 'FT8') ? 'FT4' : 'FT8';
+            this.textContent = digiMode;
+            if (digiBarVisible) {
+                stopDigiPeriodTimer();
+                resetDigiRxBuffer();
+                startDigiPeriodTimer();
+            }
+        });
+    }
+
+    // CQ-only filter checkbox
+    var cqOnlyEl = document.getElementById('digiCqOnly');
+    if (cqOnlyEl) {
+        cqOnlyEl.addEventListener('change', function() {
+            digiCqOnly = this.checked;
+            renderDigiDecodes();
+        });
+    }
+
+    // RX toggle
+    var rxToggle = document.getElementById('digiRxToggle');
+    if (rxToggle) {
+        rxToggle.addEventListener('click', function() {
+            digiRxEnabled = !digiRxEnabled;
+            if (digiRxEnabled) resetDigiRxBuffer();
+            updateDigiRxToggle();
+        });
+    }
+
+    // Settings gear button
+    var settingsBtn = document.getElementById('digiSettingsBtn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', function() {
+            document.getElementById('digiSettingsModal').classList.add('visible');
+        });
+    }
+
+    // Settings close button
+    var settingsCloseBtn = document.getElementById('digiSettingsCloseBtn');
+    if (settingsCloseBtn) {
+        settingsCloseBtn.addEventListener('click', function() {
+            document.getElementById('digiSettingsModal').classList.remove('visible');
+            updateDigiMsgRows();
+        });
+    }
+
+    // Close button
+    var closeBtn = document.getElementById('digiCloseBtn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+            digiBarVisible = false;
+            document.getElementById('digiBar').classList.add('hidden');
+            stopDigiPeriodTimer();
+            digiRxEnabled = false;
+            updateDigiRxToggle();
+            renderBottomBar();
+        });
+    }
+
+    // Log modal open button
+    var logBtn = document.getElementById('digiLogBtn');
+    if (logBtn) {
+        logBtn.addEventListener('click', function() {
+            renderDigiLog();
+            document.getElementById('digiLogModal').classList.add('visible');
+        });
+    }
+
+    // Log modal close button
+    var logCloseBtn = document.getElementById('digiLogCloseBtn');
+    if (logCloseBtn) {
+        logCloseBtn.addEventListener('click', function() {
+            document.getElementById('digiLogModal').classList.remove('visible');
+        });
+    }
+
+    // Add QSO button
+    var addQsoBtn = document.getElementById('digiAddQsoBtn');
+    if (addQsoBtn) { addQsoBtn.addEventListener('click', function() { renderDigiLog(); addDigiQso(); }); }
+
+    // Download ADIF button
+    var adifBtn = document.getElementById('digiAdifBtn');
+    if (adifBtn) { adifBtn.addEventListener('click', downloadAdif); }
+
+    // Clear log button
+    var clearLogBtn = document.getElementById('digiClearLogBtn');
+    if (clearLogBtn) { clearLogBtn.addEventListener('click', clearDigiLog); }
+
+    // Log QSO button (manual log)
+    var logQsoBtn = document.getElementById('digiLogQsoBtn');
+    if (logQsoBtn) {
+        logQsoBtn.addEventListener('click', function() {
+            var dxCall = getDxCall();
+            if (dxCall) logDigiQso(dxCall, 0);
+        });
+    }
+
+    // Erase button — clear directed panel
+    var eraseBtn = document.getElementById('digiEraseBtn');
+    if (eraseBtn) {
+        eraseBtn.addEventListener('click', function() {
+            digiDirectedDecodes = [];
+            var p = document.getElementById('digiDirectedPanel');
+            if (p) p.innerHTML = '';
+        });
+    }
+
+    // Enable TX button
+    var enableTxBtn = document.getElementById('digiEnableTxBtn');
+    if (enableTxBtn) {
+        enableTxBtn.addEventListener('click', function() {
+            digiTxEnabled = !digiTxEnabled;
+            this.classList.toggle('active', digiTxEnabled);
+            if (digiTxEnabled) {
+                initDigiTxCtx(); // ensure context is ready while we have a user gesture
+                // Arm any message that was queued while TX was disabled
+                if (digiTxQueued && !digiTxArmed) {
+                    console.log('[DIGI] Enable TX: arming pending queued message: "' + digiTxQueued + '"');
+                    digiTxAttempts = 0;
+                    digiTxArmed = true;
+                } else {
+                    console.log('[DIGI] Enable TX: enabled (nothing queued)');
+                }
+            } else {
+                console.log('[DIGI] Enable TX: disabled');
+                digiTxArmed = false;
+                digiTxQueued = null;
+                digiTxSlotParity = -1;
+            }
+            updateDigiMsgRows();
+        });
+    }
+
+    // Halt TX button — immediate stop
+    var haltBtn = document.getElementById('digiHaltBtn');
+    if (haltBtn) {
+        haltBtn.addEventListener('click', function() {
+            console.log('[DIGI] Halt TX clicked');
+            digiTxArmed = false;
+            digiTxActive = false;
+            digiTxQueued = null;
+            digiTxEnabled = false;
+            digiTxAttempts = 0;
+            digiTxSlotParity = -1;
+            digiQsoState = 'IDLE';
+            digiQsoPartner = '';
+            digiTheirReport = '';
+            var etb = document.getElementById('digiEnableTxBtn');
+            if (etb) etb.classList.remove('active');
+            send({ cmd: 'setPTT', value: false });
+            updateDigiStatus('HALT', '');
+            updateDigiMsgRows();
+        });
+    }
+
+    // Hold TX Freq button
+    var holdTxBtn = document.getElementById('digiHoldTxBtn');
+    if (holdTxBtn) {
+        holdTxBtn.addEventListener('click', function() {
+            digiHoldTxFreq = !digiHoldTxFreq;
+            updateDigiHoldTxBtn();
+            console.log('[DIGI] Hold TX Freq: ' + (digiHoldTxFreq ? 'ON' : 'OFF'));
+        });
+    }
+
+    // ft8ts ready event
+    window.addEventListener('ft8tsReady', function() {
+        digiFt8tsReady = true;
+        console.log('[DIGI] ft8ts library ready');
+    });
+
+    // Initial msg row render
+    updateDigiMsgRows();
+}
+
+// ============================================================
 // INIT
 // ============================================================
 console.log('=== WFVIEW WEB UI v2.1.0 (2026-02-16) - Dual VFO Support ===');
@@ -3463,6 +5382,7 @@ setMobileViewportHeight();
 buildColorTable();
 initSliderTracking();
 initCWHandlers();
+initDigiHandlers();
 renderBottomBar();
 drawMeter();
 updateClock();
@@ -3499,6 +5419,12 @@ if (typeof CWDecoder !== 'undefined') {
     CWDecoder.init();
 }
 
+</script>
+<script type="module">
+import { decodeFT8, encodeFT8, decodeFT4, encodeFT4, HashCallBook }
+    from '/ft8ts.mjs';
+window.ft8tsLib = { decodeFT8, encodeFT8, decodeFT4, encodeFT4, HashCallBook };
+window.dispatchEvent(new Event('ft8tsReady'));
 </script>
 <script src="cw-decoder-stft.js"></script>
 <script src="cw-decoder-utils.js"></script>
