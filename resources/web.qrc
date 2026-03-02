@@ -9,7 +9,9 @@
         <file alias="cw-decoder-utils.js">web/cw-decoder-utils.js</file>
         <file alias="model.onnx">web/models/model.onnx</file>
         <file alias="ggmorse-wasm.js">web/ggmorse-wasm.js</file>
-        <file alias="ft8ts.mjs">ft8ts/dist/ft8ts.mjs</file>
-        <file alias="ft8ts.mjs.map">ft8ts/dist/ft8ts.mjs.map</file>
+        <!-- Temporary: local patched copy until ft8ts releases a rebuilt dist (issue #1 fix).
+             When ft8ts ships a new version with dist rebuilt, revert to ft8ts/dist/ft8ts.mjs -->
+        <file alias="ft8ts.mjs">ft8ts.mjs</file>
+        <file alias="ft8ts.mjs.map">ft8ts.mjs.map</file>
     </qresource>
 </RCC>
