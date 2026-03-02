@@ -999,6 +999,11 @@ body.digi-open .digi-bar {
     overflow: hidden;
 }
 .digi-decode-col + .digi-decode-col { border-left: 1px solid #024; }
+/* Right combined column: directed takes all flex space; msg section is fixed */
+.digi-right-col { flex: 1; }
+.digi-right-col .digi-directed-panel { flex: 1; min-height: 0; }
+.digi-right-col .digi-msg-rows { flex: 0 0 auto; max-height: 110px; overflow-y: auto; }
+.digi-msg-header { border-top: 1px solid #024; margin-top: 0; }
 .digi-col-header {
     background: #000820;
     color: #08f;
@@ -1623,12 +1628,22 @@ body.digi-open .digi-bar {
     #meterCanvas { height: 54px; }
 }
 
+/* Directed panel: always show only SNR + message (dt and Hz waste space in narrow column) */
+#digiDirectedPanel .digi-decode-dt,
+#digiDirectedPanel .digi-decode-freq { display: none; }
+
 /* ---- Mobile DIGI tweaks (portrait or narrow screen) ---- */
 @media (orientation: portrait), (max-width: 600px) {
     /* Stack TX EVEN/ODD and CALL CQ buttons vertically */
     .digi-msg-cq-bar { flex-direction: column; gap: 2px; }
-    /* All Decodes panel: hide SNR, dt, Hz — show message only */
-    #digiRxPanel .digi-decode-snr,
+    /* Compact message rows on mobile */
+    .digi-msg-row { padding: 1px 3px; gap: 2px; }
+    .digi-msg-row-text { font-size: 9px; }
+    .digi-msg-row-badge { display: none; }
+    .digi-cq-parity-btn, .digi-call-cq-btn { font-size: 8px; padding: 2px 2px; }
+    /* Limit msg rows height tighter on mobile */
+    .digi-right-col .digi-msg-rows { max-height: 80px; }
+    /* All Decodes panel: keep SNR, hide dt and Hz */
     #digiRxPanel .digi-decode-dt,
     #digiRxPanel .digi-decode-freq { display: none; }
 }
@@ -1781,18 +1796,18 @@ body.digi-open .digi-bar {
                 <button id="digiHaltBtn" class="digi-halt-btn">Halt TX</button>
             </div>
 
-            <!-- Three-column decode area -->
+            <!-- Two-column decode area -->
             <div class="digi-decode-area">
+                <!-- Left: All Decodes -->
                 <div class="digi-decode-col">
                     <div class="digi-col-header">All Decodes</div>
                     <div id="digiRxPanel" class="digi-rx-panel"></div>
                 </div>
-                <div class="digi-decode-col">
+                <!-- Right: Directed (top) + QSO Messages (bottom) -->
+                <div class="digi-decode-col digi-right-col">
                     <div class="digi-col-header">Directed / Worked</div>
                     <div id="digiDirectedPanel" class="digi-directed-panel"></div>
-                </div>
-                <div class="digi-decode-col digi-msg-col">
-                    <div class="digi-col-header">QSO Messages</div>
+                    <div class="digi-col-header digi-msg-header">QSO Messages</div>
                     <div class="digi-msg-cq-bar">
                         <button id="digiCqParityBtn" class="digi-cq-parity-btn" onclick="toggleDigiCqParity()">TX EVEN</button>
                         <button id="digiCallCqBtn" class="digi-call-cq-btn" onclick="digiCallCq()">CALL CQ</button>
@@ -1801,7 +1816,7 @@ body.digi-open .digi-bar {
                 </div>
             </div>
 
-            <!-- Frequency ruler: 0–3000 Hz, click to set TX/RX freq -->
+            <!-- Frequency ruler: 300–2800 Hz, click to set TX/RX freq -->
             <div class="digi-waterfall-wrap" id="digiWaterfallWrap">
                 <div class="digi-wf-bar" id="digiWfBar">
                     <canvas id="digiWfCanvas" class="digi-wf-canvas"></canvas>
@@ -1810,7 +1825,7 @@ body.digi-open .digi-bar {
                     <div id="digiWfTxMarker" class="digi-wf-marker digi-wf-tx"><span class="digi-wf-label">TX</span></div>
                 </div>
                 <div class="digi-wf-scale">
-                    <span>0</span><span>500</span><span>1k</span><span>1.5k</span><span>2k</span><span>2.5k</span><span>3k</span>
+                    <span>300</span><span>800</span><span>1.3k</span><span>1.8k</span><span>2.3k</span><span>2.8k</span>
                 </div>
             </div>
 
@@ -1821,10 +1836,10 @@ body.digi-open .digi-bar {
                 <button id="digiHoldTxBtn" class="digi-action-btn">Hold TX</button>
                 <div class="flex-space"></div>
                 <span class="digi-field-label">TX:</span>
-                <input type="number" id="digiTxFreqDisplay" class="digi-tx-freq-display" min="200" max="3000" step="1" value="1000">
+                <input type="number" id="digiTxFreqDisplay" class="digi-tx-freq-display" min="300" max="2800" step="1" value="1000">
                 <span class="digi-field-label">Hz</span>
                 <span class="digi-field-label">RX:</span>
-                <input type="number" id="digiRxFreqDisplay" class="digi-rx-freq-display" min="200" max="3000" step="1" value="1000">
+                <input type="number" id="digiRxFreqDisplay" class="digi-rx-freq-display" min="300" max="2800" step="1" value="1000">
                 <span class="digi-field-label">Hz</span>
             </div>
 
@@ -2078,6 +2093,8 @@ var digiHoldTxFreq = false; // when true, clicking a row does not change TX freq
 // Waterfall FFT
 var WF_FFT_SIZE = 4096;
 var WF_DISPLAY_BINS = 1024; // bins 0-1023 cover 0-3000 Hz at 12kHz/4096
+var WF_FREQ_LOW  = 300;   // display range start (Hz)
+var WF_FREQ_HIGH = 2800;  // display range end (Hz)
 var wfBuf = new Float32Array(WF_FFT_SIZE);
 var wfBufPos = 0;
 var wfBufFull = false;
@@ -4566,8 +4583,8 @@ function drawDigiWaterfall() {
     // --- Update DOM frequency markers ---
     var txEl = document.getElementById('digiWfTxMarker');
     var rxEl = document.getElementById('digiWfRxMarker');
-    var txPct = (digiTxFreq / 3000 * 100).toFixed(3) + '%';
-    var rxPct = (digiRxFreq / 3000 * 100).toFixed(3) + '%';
+    var txPct = ((digiTxFreq - WF_FREQ_LOW) / (WF_FREQ_HIGH - WF_FREQ_LOW) * 100).toFixed(3) + '%';
+    var rxPct = ((digiRxFreq - WF_FREQ_LOW) / (WF_FREQ_HIGH - WF_FREQ_LOW) * 100).toFixed(3) + '%';
     if (txEl) {
         txEl.style.left = txPct;
         var txColor = digiTxEnabled ? '#ff8800' : '#00aaff';
@@ -4643,13 +4660,16 @@ function drawDigiWaterfall() {
     data.copyWithin(0, w * 4); // shift rows 1..h-1 up to rows 0..h-2
 
     // Write new row at the bottom (with linear interpolation between bins)
+    // Map canvas X to FFT bins covering WF_FREQ_LOW..WF_FREQ_HIGH only
+    var binLow  = WF_FREQ_LOW  * WF_FFT_SIZE / 12000; // first bin to display
+    var binHigh = WF_FREQ_HIGH * WF_FFT_SIZE / 12000; // last bin to display
     var rowStart = (h - 1) * w * 4;
     var dbRange = wfMaxDb - wfMinDb;
     if (dbRange < 1) dbRange = 1;
     for (var x = 0; x < w; x++) {
-        var binExact = x * WF_DISPLAY_BINS / w;
+        var binExact = binLow + x * (binHigh - binLow) / w;
         var bin0 = Math.floor(binExact);
-        var bin1 = bin0 + 1 < WF_DISPLAY_BINS ? bin0 + 1 : bin0;
+        var bin1 = bin0 + 1 < WF_FFT_SIZE / 2 ? bin0 + 1 : bin0;
         var frac = binExact - bin0;
         var db = mags[bin0] * (1 - frac) + mags[bin1] * frac;
         var norm = (db - wfMinDb) / dbRange;
@@ -4684,7 +4704,7 @@ function drawDigiWaterfall() {
             wfLabelCtx.lineJoin = 'round';
             for (var li = 0; li < visibleLabels.length; li++) {
                 var lbl = visibleLabels[li];
-                var lx = Math.round(lbl.freq / 3000 * w);
+                var lx = Math.round((lbl.freq - WF_FREQ_LOW) / (WF_FREQ_HIGH - WF_FREQ_LOW) * w);
                 if (lx < 0 || lx >= w) continue;
                 // CQ: bright green / 73: cyan
                 var fillColor   = lbl.cq ? '#40ff80' : '#40e0ff';
@@ -4876,7 +4896,7 @@ function triggerDigiDecode() {
         ft8Worker.postMessage({
             mode: digiMode,
             samples: samples.buffer,
-            sampleRate: 12000, freqLow: 200, freqHigh: 3000, depth: 2,
+            sampleRate: 12000, freqLow: 300, freqHigh: 2800, depth: 2,
             id: decodedSlotIndex
         }, [samples.buffer]);
         return;
@@ -4886,7 +4906,7 @@ function triggerDigiDecode() {
     var lib = window.ft8tsLib;
     if (!lib) { updateDigiStatus('ft8ts not loaded', ''); return; }
     if (!digiHashBook) { try { digiHashBook = new lib.HashCallBook(); } catch(e) { digiHashBook = null; } }
-    var opts = { sampleRate: 12000, freqLow: 200, freqHigh: 3000, depth: 2 };
+    var opts = { sampleRate: 12000, freqLow: 300, freqHigh: 2800, depth: 2 };
     if (digiHashBook) opts.hashCallBook = digiHashBook;
     try {
         var results = (digiMode === 'FT8' ? lib.decodeFT8 : lib.decodeFT4)(samples, opts);
@@ -5076,6 +5096,23 @@ function digiRowClick(el) {
         }
         // Arm appropriate message based on state
         armMessageForQsoState(slotIndex);
+    }
+    updateDigiMsgRows();
+}
+
+// Double-click on a DECODE row (All Decodes / Directed): run click logic then enable TX + arm.
+function digiRowDblClick(el) {
+    digiRowClick(el); // sets DX, queues message, updates state
+    if (!digiTxEnabled) {
+        digiTxEnabled = true;
+        var etb = document.getElementById('digiEnableTxBtn');
+        if (etb) etb.classList.add('active');
+        console.log('[DIGI] decode row dblclick: TX enabled');
+    }
+    // digiRowClick queues but doesn't arm when TX was disabled — arm now
+    if (digiTxQueued && !digiTxArmed) {
+        digiTxArmed = true;
+        initDigiTxCtx();
     }
     updateDigiMsgRows();
 }
@@ -5944,8 +5981,8 @@ function initDigiHandlers() {
             e.preventDefault();
             var rect = wfBar.getBoundingClientRect();
             var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            var freq = Math.round(((clientX - rect.left) / rect.width) * 3000);
-            freq = Math.max(200, Math.min(3000, freq));
+            var freq = WF_FREQ_LOW + Math.round(((clientX - rect.left) / rect.width) * (WF_FREQ_HIGH - WF_FREQ_LOW));
+            freq = Math.max(WF_FREQ_LOW, Math.min(WF_FREQ_HIGH, freq));
             if (!digiHoldTxFreq) {
                 digiTxFreq = freq;
                 digiRxFreq = freq;
@@ -5963,7 +6000,7 @@ function initDigiHandlers() {
     if (txFreqInput) {
         txFreqInput.addEventListener('change', function() {
             var v = parseInt(this.value);
-            if (!isNaN(v) && v >= 200 && v <= 3000) { digiTxFreq = v; drawDigiWaterfall(); }
+            if (!isNaN(v) && v >= WF_FREQ_LOW && v <= WF_FREQ_HIGH) { digiTxFreq = v; drawDigiWaterfall(); }
             else this.value = digiTxFreq;
         });
         txFreqInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') this.blur(); });
@@ -5972,7 +6009,7 @@ function initDigiHandlers() {
     if (rxFreqInput) {
         rxFreqInput.addEventListener('change', function() {
             var v = parseInt(this.value);
-            if (!isNaN(v) && v >= 200 && v <= 3000) { digiRxFreq = v; drawDigiWaterfall(); }
+            if (!isNaN(v) && v >= WF_FREQ_LOW && v <= WF_FREQ_HIGH) { digiRxFreq = v; drawDigiWaterfall(); }
             else this.value = digiRxFreq;
         });
         rxFreqInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') this.blur(); });
@@ -6129,6 +6166,34 @@ function initDigiHandlers() {
 
     // Initial msg row render
     updateDigiMsgRows();
+
+    // Long press on decode rows — mobile alternative to double-click
+    // 500 ms hold on a .digi-decode-row triggers digiRowDblClick (TX enable + arm)
+    function setupDigiLongPress(panel) {
+        var lpTimer = null, lpEl = null, lpX = 0, lpY = 0;
+        panel.addEventListener('touchstart', function(e) {
+            var row = e.target.closest ? e.target.closest('.digi-decode-row') : null;
+            if (!row) return;
+            lpEl = row; lpX = e.touches[0].clientX; lpY = e.touches[0].clientY;
+            lpTimer = setTimeout(function() {
+                lpTimer = null;
+                if (navigator.vibrate) navigator.vibrate(40);
+                digiRowDblClick(lpEl);
+            }, 500);
+        }, { passive: true });
+        panel.addEventListener('touchmove', function(e) {
+            if (!lpTimer) return;
+            var dx = e.touches[0].clientX - lpX, dy = e.touches[0].clientY - lpY;
+            if (Math.abs(dx) > 8 || Math.abs(dy) > 8) { clearTimeout(lpTimer); lpTimer = null; }
+        }, { passive: true });
+        function cancelLp() { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } }
+        panel.addEventListener('touchend', cancelLp, { passive: true });
+        panel.addEventListener('touchcancel', cancelLp, { passive: true });
+    }
+    var rxPanelEl = document.getElementById('digiRxPanel');
+    var dirPanelEl = document.getElementById('digiDirectedPanel');
+    if (rxPanelEl) setupDigiLongPress(rxPanelEl);
+    if (dirPanelEl) setupDigiLongPress(dirPanelEl);
 }
 
 // ============================================================
