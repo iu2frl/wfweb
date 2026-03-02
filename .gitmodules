@@ -1,0 +1,3 @@
+[submodule "resources/ft8ts"]
+	path = resources/ft8ts
+	url = https://github.com/e04/ft8ts.git
