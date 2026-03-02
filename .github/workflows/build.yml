@@ -142,3 +142,4 @@ jobs:
             wfweb-x86_64-deb/*.deb
             wfweb-arm64-deb/*.deb
           generate_release_notes: true
+          overwrite: true
