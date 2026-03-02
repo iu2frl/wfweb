@@ -1622,6 +1622,16 @@ body.digi-open .digi-bar {
     #meterSection { flex: 0 0 40%; }
     #meterCanvas { height: 54px; }
 }
+
+/* ---- Mobile DIGI tweaks (portrait or narrow screen) ---- */
+@media (orientation: portrait), (max-width: 600px) {
+    /* Stack TX EVEN/ODD and CALL CQ buttons vertically */
+    .digi-msg-cq-bar { flex-direction: column; gap: 2px; }
+    /* All Decodes panel: hide SNR, dt, Hz — show message only */
+    #digiRxPanel .digi-decode-snr,
+    #digiRxPanel .digi-decode-dt,
+    #digiRxPanel .digi-decode-freq { display: none; }
+}
 </style>
 </head>
 <body>
@@ -4693,25 +4703,27 @@ function drawDigiWaterfall() {
                 wfLabelCtx.stroke();
                 wfLabelCtx.restore();
 
-                // Rotated label anchored at the bottom of the waterfall
-                wfLabelCtx.save();
-                wfLabelCtx.lineWidth = 2;
-                var tw = wfLabelCtx.measureText(lbl.from).width;
-                // Translate so the label box is centered on lineX (= lx + fontSize/2)
-                wfLabelCtx.translate(lineX - Math.round(fontSize / 2), h - 4);
-                wfLabelCtx.rotate(-Math.PI / 2);
-                // Black background
-                wfLabelCtx.fillStyle = 'rgba(0,0,0,0.75)';
-                wfLabelCtx.fillRect(-2, -3, tw + 4, fontSize + 6);
-                // Colored border
-                wfLabelCtx.strokeStyle = strokeColor;
-                wfLabelCtx.strokeRect(-2, -3, tw + 4, fontSize + 6);
-                // Text outline then fill
-                wfLabelCtx.strokeStyle = strokeColor;
-                wfLabelCtx.strokeText(lbl.from, 0, 0);
-                wfLabelCtx.fillStyle = fillColor;
-                wfLabelCtx.fillText(lbl.from, 0, 0);
-                wfLabelCtx.restore();
+                // Rotated callsign label — omitted on mobile (narrow canvas)
+                if (w >= 500) {
+                    wfLabelCtx.save();
+                    wfLabelCtx.lineWidth = 2;
+                    var tw = wfLabelCtx.measureText(lbl.from).width;
+                    // Translate so the label box is centered on lineX (= lx + fontSize/2)
+                    wfLabelCtx.translate(lineX - Math.round(fontSize / 2), h - 4);
+                    wfLabelCtx.rotate(-Math.PI / 2);
+                    // Black background
+                    wfLabelCtx.fillStyle = 'rgba(0,0,0,0.75)';
+                    wfLabelCtx.fillRect(-2, -3, tw + 4, fontSize + 6);
+                    // Colored border
+                    wfLabelCtx.strokeStyle = strokeColor;
+                    wfLabelCtx.strokeRect(-2, -3, tw + 4, fontSize + 6);
+                    // Text outline then fill
+                    wfLabelCtx.strokeStyle = strokeColor;
+                    wfLabelCtx.strokeText(lbl.from, 0, 0);
+                    wfLabelCtx.fillStyle = fillColor;
+                    wfLabelCtx.fillText(lbl.from, 0, 0);
+                    wfLabelCtx.restore();
+                }
             }
             wfLabelCtx.restore();
         }
