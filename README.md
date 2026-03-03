@@ -46,29 +46,97 @@ The web interface is served directly by the `wfview` binary over HTTPS (self-sig
 
 ## Quick start (headless, IC-7300 via USB)
 
-Install the package, then create a configuration file:
-
-```ini
-# ~/.config/wfview/wfview.conf
-
-[Program]
-hasRunSetup=true
-version=0.2.2
-
-[Radio]
-Manufacturer=0
-RigCIVuInt=148
-SerialPortRadio=auto
-SerialPortBaud=115200
-```
-
-Then run:
+The IC-7300 connected via USB is the primary tested configuration. No configuration file is needed — just install and run:
 
 ```bash
 wfview
 ```
 
-Open your browser at `https://<host>:8080`.
+Open your browser at `https://<host>:8080`. On first visit, accept the browser's self-signed certificate warning.
+
+wfweb will detect the IC-7300 automatically (CI-V address 0x94, baud 115200, port auto-detected).
+
+### Other radios
+
+For radios other than the IC-7300, create a configuration file at `~/.config/wfview/wfview.conf`. The `[Program]` section tells wfweb to skip the first-time setup dialog; the `[Radio]` section identifies the rig.
+
+> **Note:** Only the IC-7300 via USB has been tested. The settings below are derived from CI-V documentation and are provided as a starting point — use at your own risk and please report results.
+
+#### IC-705 (USB)
+
+```ini
+[Program]
+hasRunSetup=true
+
+[Radio]
+Manufacturer=0
+RigCIVuInt=164
+SerialPortRadio=auto
+SerialPortBaud=115200
+```
+
+#### IC-7610 (USB)
+
+```ini
+[Program]
+hasRunSetup=true
+
+[Radio]
+Manufacturer=0
+RigCIVuInt=152
+SerialPortRadio=auto
+SerialPortBaud=115200
+```
+
+#### IC-9700 (USB)
+
+```ini
+[Program]
+hasRunSetup=true
+
+[Radio]
+Manufacturer=0
+RigCIVuInt=162
+SerialPortRadio=auto
+SerialPortBaud=115200
+```
+
+#### IC-7100 (USB)
+
+```ini
+[Program]
+hasRunSetup=true
+
+[Radio]
+Manufacturer=0
+RigCIVuInt=136
+SerialPortRadio=auto
+SerialPortBaud=115200
+```
+
+#### IC-7410 (USB)
+
+```ini
+[Program]
+hasRunSetup=true
+
+[Radio]
+Manufacturer=0
+RigCIVuInt=128
+SerialPortRadio=auto
+SerialPortBaud=115200
+```
+
+CI-V addresses are listed in decimal (`RigCIVuInt`). If your radio has been configured with a non-default CI-V address, use that value instead. The default CI-V addresses for each model are:
+
+| Radio | CI-V (hex) | CI-V (decimal) |
+|---|:---:|:---:|
+| IC-7300 | 0x94 | 148 |
+| IC-705 | 0xA4 | 164 |
+| IC-7610 | 0x98 | 152 |
+| IC-9700 | 0xA2 | 162 |
+| IC-7100 | 0x88 | 136 |
+| IC-7410 | 0x80 | 128 |
 
 ### Key configuration parameters
 
@@ -76,7 +144,7 @@ Open your browser at `https://<host>:8080`.
 |---|---|---|---|
 | `hasRunSetup` | `[Program]` | Skip first-time setup dialog | `true` |
 | `Manufacturer` | `[Radio]` | 0=Icom, 1=Kenwood, 2=Yaesu | `0` |
-| `RigCIVuInt` | `[Radio]` | CI-V address (decimal). IC-7300=148 (0x94) | `148` |
+| `RigCIVuInt` | `[Radio]` | CI-V address (decimal) | `148` |
 | `SerialPortRadio` | `[Radio]` | Serial port, or `auto` | `/dev/ttyUSB0` |
 | `SerialPortBaud` | `[Radio]` | Baud rate | `115200` |
 | `AudioOutput` | `[LAN]` | **Optional.** Local server audio output device. Omit for browser-only use. | `hw:CARD=CODEC,DEV=0` |
