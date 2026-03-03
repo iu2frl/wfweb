@@ -62,6 +62,42 @@ For radios other than the IC-7300, create a configuration file at `~/.config/wfv
 
 > **Note:** Only the IC-7300 via USB has been tested. The settings below are derived from CI-V documentation and are provided as a starting point — use at your own risk and please report results.
 
+#### IC-7300 Mk2 (USB)
+
+```ini
+[Program]
+hasRunSetup=true
+
+[Radio]
+Manufacturer=0
+RigCIVuInt=130
+SerialPortRadio=auto
+SerialPortBaud=115200
+```
+
+#### IC-7300 Mk2 (Ethernet)
+
+```ini
+[Program]
+hasRunSetup=true
+
+[Radio]
+Manufacturer=0
+RigCIVuInt=130
+
+[LAN]
+EnableLAN=true
+IPAddress=192.168.1.100
+ControlLANPort=50001
+SerialLANPort=50002
+AudioLANPort=50003
+ScopeLANPort=50004
+Username=admin
+Password=
+```
+
+Replace `192.168.1.100` with your radio's IP address. `Username` and `Password` match the network settings configured in the radio's menu. Ports 50001–50004 are Icom's defaults and normally do not need to be changed.
+
 #### IC-705 (USB)
 
 ```ini
@@ -132,6 +168,7 @@ CI-V addresses are listed in decimal (`RigCIVuInt`). If your radio has been conf
 | Radio | CI-V (hex) | CI-V (decimal) |
 |---|:---:|:---:|
 | IC-7300 | 0x94 | 148 |
+| IC-7300 Mk2 | 0x82 | 130 |
 | IC-705 | 0xA4 | 164 |
 | IC-7610 | 0x98 | 152 |
 | IC-9700 | 0xA2 | 162 |
