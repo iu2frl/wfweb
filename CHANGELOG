@@ -6,6 +6,36 @@ a built-in web interface. See https://gitlab.com/eliggett/wfview for the
 upstream wfview history.
 
 
+v0.2.2 (2026-03-03)
+--------------------
+
+DIGI panel (FT8/FT4):
+- Fix TX double-fire regression: user-initiated TX uses a 13 s slot window
+  while auto re-arm reverts to 4.5 s, preventing the same slot firing twice
+- Fix TX waterfall splatter and add local TX audio monitor
+- Fix auto-QSO cycle, TX slot-window logic, and QSO logging state machine
+
+Audio:
+- Fix ALSA underruns during FT8 TX (USB audio path): server-side pre-buffer
+  accumulates PCM chunks until the ALSA buffer is full before starting
+  playback; IdleState watchdog stops the device cleanly when the buffer
+  drains at end of TX, eliminating snd_pcm_recover underruns
+
+Infrastructure:
+- ft8ts submodule updated to v0.0.12; upstream ships the pack28 fix
+  (short callsigns like K1FM no longer corrupted); local vendored patch removed
+- CI: overwrite release assets on re-tag
+
+
+v0.2.1 (2026-03-02)
+--------------------
+
+Infrastructure:
+- ft8ts: vendor patched dist locally pending upstream fix for issue #1
+  (pack28 bug corrupting 4-character callsigns like K1FM)
+- README: FT8 screenshot, vertical mobile screenshots, CW/FT8 feature rows
+
+
 v0.2.0 (2026-03-01)
 --------------------
 

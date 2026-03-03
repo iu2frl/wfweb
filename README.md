@@ -53,7 +53,7 @@ Install the package, then create a configuration file:
 
 [Program]
 hasRunSetup=true
-version=0.2.0
+version=0.2.2
 
 [Radio]
 Manufacturer=0
