@@ -165,6 +165,11 @@ private:
     QIODevice *usbAudioOutputDevice = nullptr;
     bool txAudioConfigured = false;
     int usbOutputChannels = 1;
+    // Pre-TX buffer: accumulate chunks before starting ALSA so it begins with
+    // a full buffer instead of racing the drain rate from the first byte.
+    QByteArray preTxBuffer;
+    bool preTxBuffering = false;
+    bool txAudioActive = false; // true once pre-buffer is flushed; stops device on IdleState
 
     // DATA MOD OFF auto-switch to USB when web mic is active
     rigInput savedDataOffMod;

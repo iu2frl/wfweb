@@ -393,21 +393,44 @@ void webServer::onWsBinaryMessage(QByteArray message)
     QByteArray pcmData = message.mid(6);
     if (pcmData.isEmpty()) return;
 
-    if (usbAudioOutputDevice) {
-        // USB path: write directly to USB audio output device
+    if (usbAudioOutput && txAudioConfigured) {
+        // USB path
+        // Expand mono → stereo if the device requires it
+        QByteArray writeData;
         if (usbOutputChannels == 2) {
-            int numSamples = pcmData.size() / 2; // 16-bit mono samples
-            QByteArray stereo;
-            stereo.resize(numSamples * 4); // 16-bit stereo
+            int numSamples = pcmData.size() / 2;
+            writeData.resize(numSamples * 4);
             const qint16 *src = reinterpret_cast<const qint16 *>(pcmData.constData());
-            qint16 *dst = reinterpret_cast<qint16 *>(stereo.data());
+            qint16 *dst = reinterpret_cast<qint16 *>(writeData.data());
             for (int i = 0; i < numSamples; i++) {
                 dst[i * 2] = src[i];
                 dst[i * 2 + 1] = src[i];
             }
-            usbAudioOutputDevice->write(stereo);
         } else {
-            usbAudioOutputDevice->write(pcmData);
+            writeData = pcmData;
+        }
+
+        if (preTxBuffering) {
+            // Accumulate chunks until the buffer reaches the device's full capacity,
+            // then start ALSA and dump them all at once.  This ensures ALSA begins
+            // with a full buffer rather than an empty one, providing a real jitter
+            // absorber instead of racing the drain rate from the first byte.
+            preTxBuffer.append(writeData);
+            int bufSize = usbAudioOutput->bufferSize();
+            if (bufSize <= 0) bufSize = 9600; // fallback if not yet started
+            if (preTxBuffer.size() >= bufSize) {
+                preTxBuffering = false;
+                usbAudioOutputDevice = usbAudioOutput->start();
+                if (usbAudioOutputDevice) {
+                    usbAudioOutputDevice->write(preTxBuffer);
+                    txAudioActive = true; // arm IdleState watchdog — set AFTER write
+                } else {
+                    qWarning() << "Web: TX audio ALSA start() failed after pre-buffer";
+                }
+                preTxBuffer.clear();
+            }
+        } else if (usbAudioOutputDevice) {
+            usbAudioOutputDevice->write(writeData);
         }
     } else if (txConverter) {
         // LAN path: encode PCM → rig codec, then emit for transmission
@@ -634,6 +657,16 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
                 }
             }
             micActiveClient = client;
+            if (usbAudioOutput) {
+                // Stop any previous session cleanly, then arm the pre-buffer.
+                // ALSA will be started only once the pre-buffer is full, so it
+                // never begins with an empty buffer and races the drain rate.
+                if (usbAudioOutput->state() != QAudio::StoppedState)
+                    usbAudioOutput->stop();
+                usbAudioOutputDevice = nullptr;
+                preTxBuffer.clear();
+                preTxBuffering = true;
+            }
         } else {
             // Restore previous DATA MOD OFF setting
             if (dataOffModSaved && queue) {
@@ -642,6 +675,13 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
             }
             dataOffModSaved = false;
             micActiveClient = nullptr;
+            preTxBuffering = false;
+            preTxBuffer.clear();
+            txAudioActive = false;
+            if (usbAudioOutput) {
+                usbAudioOutput->stop();
+                usbAudioOutputDevice = nullptr;
+            }
         }
     }
     else if (type == "getStatus") {
@@ -1364,15 +1404,18 @@ void webServer::setupUsbAudio(quint32 sampleRate)
         }
 
         usbAudioOutput = new QAudioOutput(usbOutDevice, outFormat, this);
-        usbAudioOutputDevice = usbAudioOutput->start();
-        if (usbAudioOutputDevice) {
-            txAudioConfigured = true;
-            qInfo() << "Web: USB audio output configured for TX, channels=" << usbOutputChannels;
-        } else {
-            qWarning() << "Web: Failed to start USB audio output";
-            delete usbAudioOutput;
-            usbAudioOutput = nullptr;
-        }
+        // Stop the device cleanly when the buffer drains naturally at end of TX,
+        // preventing ALSA from calling snd_pcm_recover on an empty buffer.
+        connect(usbAudioOutput, &QAudioOutput::stateChanged, this, [this](QAudio::State newState) {
+            if (newState == QAudio::IdleState && txAudioActive) {
+                txAudioActive = false;
+                usbAudioOutput->stop();
+                usbAudioOutputDevice = nullptr;
+            }
+        });
+        // Device starts stopped; it is started fresh on each enableMic=true via pre-buffer.
+        txAudioConfigured = true;
+        qInfo() << "Web: USB audio output configured for TX, channels=" << usbOutputChannels;
     }
 #else
     QAudioDevice usbOutDevice;
