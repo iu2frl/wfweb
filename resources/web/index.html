@@ -2078,6 +2078,7 @@ var digiTxArmed = false;
 var digiTxActive = false; // true while audio is streaming — prevents concurrent TXs
 var digiTxWfSamples = null; // Float32Array @12kHz fed into wfBuf during TX
 var digiMonitorSrc = null; // AudioBufferSourceNode for local TX monitor
+var digiTxUserInitiated = false; // true when TX was armed by a user gesture (dblclick); widens slot window
 var digiTxWfPos = 0;        // read position into digiTxWfSamples
 var digiTxSeq = 0;
 var digiTxAttempts = 0;
@@ -4502,7 +4503,11 @@ function startDigiPeriodTimer() {
         // executeDigiTx() clears digiTxArmed only when it is ready to proceed;
         // if it returns early for any reason, digiTxArmed stays true so the
         // next timer tick can retry within the same window.
-        if (info.slotPhase < 4.5 && digiTxArmed && !digiTxActive && !digiDecodeInProgress) {
+        // User-initiated TX (dblclick) gets a 13 s window to cover decode delay + reaction time.
+        // Auto re-arm from onDone uses the narrow 4.5 s window to avoid firing again in the
+        // same slot's decode tail (seconds 12-15 / 6-7.5 for FT4).
+        var txPhaseLimit = digiTxUserInitiated ? 13 : 4.5;
+        if (info.slotPhase < txPhaseLimit && digiTxArmed && !digiTxActive && !digiDecodeInProgress) {
             var currentParity = info.slotIndex % 2;
             if (digiTxSlotParity >= 0 && currentParity !== digiTxSlotParity) {
                 // Wrong parity slot — FT8 requires strict alternation with the DX station.
@@ -5101,22 +5106,26 @@ function digiRowClick(el) {
         // Message is addressed to us when parts[0] matches MY CALL
         var msgToMe = myCall && parts[0].toUpperCase() === myCall.toUpperCase();
         if (msgToMe) {
+            var roundedSnr = Math.round(snr);
+            var ourSnrStr = (roundedSnr >= 0 ? '+' : '') + roundedSnr;
             if (/\bRR73\b/i.test(msg) || /\bRRR\b/i.test(msg)) {
                 digiQsoState = 'RRR';
-                digiTheirReport = '';
+                digiTheirReport = parts[2] || '';
+                digiOurReport = digiOurReport || ''; // preserve if already set mid-QSO
             } else if (parts.length >= 3 && /^R[-+]?\d+$/i.test(parts[2])) {
                 // They sent R-report → reply RRR
                 digiQsoState = 'RREPORT';
-                digiTheirReport = '';
+                digiTheirReport = parts[2]; // their R-report of us → rstRcvd
+                digiOurReport = ourSnrStr;  // our SNR of them → rstSent
             } else if (parts.length >= 3 && /^[-+]?\d+$/i.test(parts[2])) {
-                // They sent us a signal report → reply with our SNR of their signal
+                // They sent us a plain signal report → reply R+our_snr
                 digiQsoState = 'REPORT';
-                var roundedSnr = Math.round(snr);
-                digiTheirReport = (roundedSnr >= 0 ? '+' : '') + roundedSnr;
+                digiTheirReport = parts[2]; // their report of us → rstRcvd
+                digiOurReport = ourSnrStr;  // our SNR of them → Tx2 R-report + rstSent
             } else {
                 digiQsoState = 'REPORT';
-                var roundedSnr2 = Math.round(snr);
-                digiTheirReport = (roundedSnr2 >= 0 ? '+' : '') + roundedSnr2;
+                digiTheirReport = '';
+                digiOurReport = ourSnrStr;
             }
         } else {
             // Message not to us — just target that station from IDLE
@@ -5131,6 +5140,16 @@ function digiRowClick(el) {
 
 // Double-click on a DECODE row (All Decodes / Directed): run click logic then enable TX + arm.
 function digiRowDblClick(el) {
+    // If a transmission is already in progress, abort it transparently so the
+    // new selection takes over immediately (same slot if phase allows).
+    if (digiTxActive) {
+        console.log('[DIGI] dblclick: aborting active TX to replace with new target');
+        if (digiMonitorSrc) { try { digiMonitorSrc.stop(); } catch(e) {} digiMonitorSrc = null; }
+        digiTxActive = false;
+        digiTxWfSamples = null;
+        send({ cmd: 'setPTT', value: false });
+        send({ cmd: 'enableMic', value: false });
+    }
     digiRowClick(el); // sets DX, queues message, updates state
     if (!digiTxEnabled) {
         digiTxEnabled = true;
@@ -5138,11 +5157,11 @@ function digiRowDblClick(el) {
         if (etb) etb.classList.add('active');
         console.log('[DIGI] decode row dblclick: TX enabled');
     }
-    // digiRowClick queues but doesn't arm when TX was disabled — arm now
-    if (digiTxQueued && !digiTxArmed) {
-        digiTxArmed = true;
-        initDigiTxCtx();
-    }
+    // Always ensure the AudioContext is running — initDigiTxCtx() must be called
+    // from a user-gesture handler (which dblclick is), before the timer fires TX.
+    initDigiTxCtx();
+    digiTxUserInitiated = true; // user gesture → allow wider slot window for late starts
+    if (digiTxQueued && !digiTxArmed) digiTxArmed = true;
     updateDigiMsgRows();
 }
 
@@ -5260,7 +5279,9 @@ function getDigiMsgTexts() {
     var myGrid = getMyGrid() || 'AA00';
     var dxCall = getDxCall();
     // Format report with + for positive values (WSJT-X convention)
-    var rpt = digiTheirReport || '';
+    // digiOurReport = our SNR of their signal (used in Tx2 R-report)
+    // digiTheirReport = their report of our signal (used in Tx1.5 plain report, fallback)
+    var rpt = digiOurReport || digiTheirReport || '';
     var rptNum = parseInt(rpt, 10);
     if (isNaN(rptNum)) rptNum = 0;
     var report = (rptNum >= 0 ? '+' : '') + rptNum;
@@ -5389,20 +5410,34 @@ function handleDigiAutoQso(decodes, decodedSlotIndex) {
                 updateDigiMsgRows();
                 break;
             }
-        } else if (digiQsoState === 'EXCHANGE') {
-            // Look for <MY> <PARTNER> RR73 / RRR
+        } else if (digiQsoState === 'EXCHANGE' || digiQsoState === 'REPORT') {
+            // EXCHANGE: auto-QSO path (we sent R-report via handleDigiAutoQso CALLING→EXCHANGE)
+            // REPORT:   click path (user double-clicked reply to their CQ, we queued Tx2 via armMessageForQsoState)
+            // Both wait for <MY> <PARTNER> RR73 / RRR → queue 73, log.
             if (parts[0] === myCall && parts[1] === digiQsoPartner &&
                 (parts[2] === 'RR73' || parts[2] === 'RRR')) {
-                console.log('[DIGI QSO] EXCHANGE→LOGGED: received ' + parts[2]);
+                console.log('[DIGI QSO] ' + digiQsoState + '→LOGGED: received ' + parts[2]);
                 digiTxAttempts = 0;
                 digiTxQueued = digiQsoPartner + ' ' + myCall + ' 73';
-                digiTxSlotParity = (dSlot + 1) % 2; // TX on slot OPPOSITE to their slot
+                digiTxSlotParity = (dSlot + 1) % 2;
                 if (digiTxEnabled) { digiTxArmed = true; console.log('[DIGI QSO] armed (parity ' + digiTxSlotParity + '): ' + digiTxQueued); }
                 else { console.log('[DIGI QSO] TX disabled — queued but not armed: ' + digiTxQueued); }
                 digiQsoState = 'LOGGED';
-                // Log using the report we sent them (digiOurReport), not the decode SNR
                 var logReport = parseInt(digiOurReport, 10) || 0;
                 logDigiQso(digiQsoPartner, logReport);
+                break;
+            }
+        } else if (digiQsoState === 'RREPORT') {
+            // We sent RRR; look for <MY> <PARTNER> 73 → QSO complete, log.
+            if (parts[0] === myCall && parts[1] === digiQsoPartner && parts[2] === '73') {
+                console.log('[DIGI QSO] RREPORT→IDLE: received 73 from ' + digiQsoPartner);
+                var logReport2 = parseInt(digiOurReport, 10) || 0;
+                logDigiQso(digiQsoPartner, logReport2);
+                digiQsoState = 'IDLE'; digiQsoPartner = ''; digiTxQueued = null;
+                digiTxArmed = false; digiTxAttempts = 0; digiTxSlotParity = -1;
+                digiOurReport = ''; digiTheirReport = '';
+                updateDigiStatus('IDLE', '');
+                updateDigiMsgRows();
                 break;
             }
         } else if (digiQsoState === 'LOGGED') {
@@ -5431,6 +5466,7 @@ function executeDigiTx(slotPhase) {
 
     // Commit: clear armed flag now that we are actually proceeding
     digiTxArmed = false;
+    digiTxUserInitiated = false; // consumed — re-arm from onDone uses the narrow window
     digiTxActive = true;
 
     var df = (digiTxFreq >= 200 && digiTxFreq <= 3000) ? digiTxFreq : 1000;
@@ -6143,7 +6179,7 @@ function initDigiHandlers() {
     if (logQsoBtn) {
         logQsoBtn.addEventListener('click', function() {
             var dxCall = getDxCall();
-            if (dxCall) logDigiQso(dxCall, 0);
+            if (dxCall) logDigiQso(dxCall, parseInt(digiOurReport, 10) || 0);
         });
     }
 
@@ -6200,6 +6236,7 @@ function initDigiHandlers() {
             digiQsoState = 'IDLE';
             digiQsoPartner = '';
             digiTheirReport = '';
+            digiOurReport = '';
             var etb = document.getElementById('digiEnableTxBtn');
             if (etb) etb.classList.remove('active');
             send({ cmd: 'setPTT', value: false });
