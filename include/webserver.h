@@ -108,6 +108,10 @@ private:
     void serveStaticFile(QTcpSocket *socket, const QString &path);
     void sendHttpResponse(QTcpSocket *socket, int statusCode, const QString &statusText,
                          const QByteArray &contentType, const QByteArray &body);
+    void handleRestRequest(QTcpSocket *socket, const QString &method,
+                           const QString &path, const QByteArray &body);
+    void sendRestResponse(QTcpSocket *socket, int statusCode, const QJsonObject &json);
+    QJsonObject buildInfoJson() const;
     void sendJsonToAll(const QJsonObject &obj);
     void sendJsonTo(QWebSocket *client, const QJsonObject &obj);
     void sendBinaryToAll(const QByteArray &data);
@@ -122,6 +126,7 @@ private:
     bool setupSsl();
 
     QTcpServer *httpServer = nullptr;
+    QTcpServer *restServer = nullptr;  // plain HTTP for microcontrollers/scripts (SSL mode only)
     QWebSocketServer *wsServer = nullptr;
     QList<QWebSocket *> wsClients;
     cachingQueue *queue = nullptr;

@@ -45,6 +45,9 @@ webServer::~webServer()
     if (wsServer) {
         wsServer->close();
     }
+    if (restServer) {
+        restServer->close();
+    }
     if (httpServer) {
         httpServer->close();
     }
@@ -140,6 +143,16 @@ void webServer::init(quint16 httpPort, quint16 wsPort)
         // Does NOT listen on its own port — connections handed off via handleConnection
         wsServer = new QWebSocketServer(QStringLiteral("wfview Web"), QWebSocketServer::NonSecureMode, this);
         connect(wsServer, &QWebSocketServer::newConnection, this, &webServer::onWsNewConnection);
+
+        // Plain HTTP server on wsPort for microcontrollers/scripts that don't support TLS
+        restServer = new QTcpServer(this);
+        if (restServer->listen(QHostAddress::Any, wsPort)) {
+            qInfo() << "Web plain HTTP REST server listening on port" << wsPort
+                    << "(use http:// on this port for scripts/microcontrollers)";
+            connect(restServer, &QTcpServer::newConnection, this, &webServer::onHttpConnection);
+        } else {
+            qWarning() << "Web plain HTTP REST server failed to listen on port" << wsPort;
+        }
     } else {
         // Plain HTTP + WS on separate ports (fallback)
         httpServer = new QTcpServer(this);
@@ -227,7 +240,9 @@ void webServer::receiveRigCaps(rigCapabilities *caps)
 
 void webServer::onHttpConnection()
 {
-    QTcpSocket *socket = httpServer->nextPendingConnection();
+    QTcpServer *srv = qobject_cast<QTcpServer *>(sender());
+    if (!srv) return;
+    QTcpSocket *socket = srv->nextPendingConnection();
     connect(socket, &QTcpSocket::readyRead, this, &webServer::onHttpReadyRead);
     connect(socket, &QTcpSocket::disconnected, this, &webServer::onHttpDisconnected);
 }
@@ -237,8 +252,8 @@ void webServer::onHttpReadyRead()
     QTcpSocket *socket = qobject_cast<QTcpSocket *>(sender());
     if (!socket) return;
 
-    // In SSL single-port mode, detect WebSocket upgrade requests
-    if (sslEnabled) {
+    // WebSocket upgrade only applies to SSL sockets (plain HTTP connections go straight to REST/static)
+    if (qobject_cast<QSslSocket *>(socket)) {
         QByteArray peek = socket->peek(4096);
         if (peek.contains("Upgrade: websocket") || peek.contains("Upgrade: WebSocket")) {
             disconnect(socket, &QTcpSocket::readyRead, this, &webServer::onHttpReadyRead);
@@ -249,17 +264,47 @@ void webServer::onHttpReadyRead()
     }
 
     QByteArray request = socket->readAll();
-    QString requestStr = QString::fromUtf8(request);
 
-    // Parse the first line: GET /path HTTP/1.1
-    QStringList lines = requestStr.split("\r\n");
-    if (lines.isEmpty()) return;
+    // Split headers from body on \r\n\r\n
+    int sepIdx = request.indexOf("\r\n\r\n");
+    QByteArray headerSection = (sepIdx >= 0) ? request.left(sepIdx) : request;
+    QByteArray body;
+    if (sepIdx >= 0) {
+        int bodyStart = sepIdx + 4;
+        QByteArray lowerHeaders = headerSection.toLower();
+        int clIdx = lowerHeaders.indexOf("content-length:");
+        if (clIdx >= 0) {
+            int clEnd = lowerHeaders.indexOf("\r\n", clIdx);
+            int contentLength = headerSection.mid(clIdx + 15, clEnd - clIdx - 15).trimmed().toInt();
+            if (contentLength > 0)
+                body = request.mid(bodyStart, contentLength);
+        }
+    }
 
-    QStringList parts = lines.first().split(' ');
+    // Parse first line: METHOD /path HTTP/1.1
+    int firstLineEnd = headerSection.indexOf("\r\n");
+    QByteArray firstLine = (firstLineEnd >= 0) ? headerSection.left(firstLineEnd) : headerSection;
+    QList<QByteArray> parts = firstLine.split(' ');
     if (parts.size() < 2) return;
 
-    QString method = parts[0];
-    QString path = parts[1];
+    QString method = QString::fromUtf8(parts[0]);
+    QString path = QString::fromUtf8(parts[1]);
+
+    // Strip query string
+    int qIdx = path.indexOf('?');
+    if (qIdx >= 0) path = path.left(qIdx);
+
+    // OPTIONS preflight for CORS
+    if (method == "OPTIONS") {
+        sendRestResponse(socket, 200, QJsonObject());
+        return;
+    }
+
+    // REST API routing
+    if (path.startsWith("/api/v1/")) {
+        handleRestRequest(socket, method, path, body);
+        return;
+    }
 
     if (method != "GET") {
         sendHttpResponse(socket, 405, "Method Not Allowed", "text/plain", "Method Not Allowed");
@@ -326,6 +371,516 @@ void webServer::sendHttpResponse(QTcpSocket *socket, int statusCode, const QStri
     socket->write(response);
     socket->flush();
     socket->disconnectFromHost();
+}
+
+void webServer::sendRestResponse(QTcpSocket *socket, int statusCode, const QJsonObject &json)
+{
+    QByteArray body;
+    if (!json.isEmpty())
+        body = QJsonDocument(json).toJson(QJsonDocument::Compact);
+
+    QString statusText;
+    switch (statusCode) {
+    case 200: statusText = "OK"; break;
+    case 202: statusText = "Accepted"; break;
+    case 400: statusText = "Bad Request"; break;
+    case 404: statusText = "Not Found"; break;
+    case 405: statusText = "Method Not Allowed"; break;
+    case 503: statusText = "Service Unavailable"; break;
+    default:  statusText = "OK"; break;
+    }
+
+    QByteArray response;
+    response.append(QString("HTTP/1.1 %1 %2\r\n").arg(statusCode).arg(statusText).toUtf8());
+    response.append("Content-Type: application/json\r\n");
+    response.append(QString("Content-Length: %1\r\n").arg(body.size()).toUtf8());
+    response.append("Connection: close\r\n");
+    response.append("Access-Control-Allow-Origin: *\r\n");
+    response.append("Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS\r\n");
+    response.append("Access-Control-Allow-Headers: Content-Type\r\n");
+    response.append("\r\n");
+    response.append(body);
+
+    socket->write(response);
+    socket->flush();
+    socket->disconnectFromHost();
+}
+
+void webServer::handleRestRequest(QTcpSocket *socket, const QString &method,
+                                   const QString &path, const QByteArray &body)
+{
+    // Normalize path: strip trailing slash
+    QString p = path;
+    if (p.length() > 1 && p.endsWith('/')) p.chop(1);
+
+    // Helper: parse JSON body; returns empty object on empty/invalid input
+    auto parseBody = [&]() -> QJsonObject {
+        if (body.isEmpty()) return QJsonObject();
+        QJsonParseError err;
+        QJsonDocument doc = QJsonDocument::fromJson(body, &err);
+        if (err.error != QJsonParseError::NoError || !doc.isObject()) return QJsonObject();
+        return doc.object();
+    };
+
+    // --- GET /api/v1/radio ---
+    if (p == "/api/v1/radio") {
+        if (method != "GET") {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e); return;
+        }
+        QJsonObject resp;
+        resp["info"] = buildInfoJson();
+        if (queue && rigCaps) {
+            QJsonObject status = buildStatusJson();
+            status.remove("type");
+            resp["status"] = status;
+        }
+        sendRestResponse(socket, 200, resp);
+        return;
+    }
+
+    // --- GET /api/v1/radio/info ---
+    if (p == "/api/v1/radio/info") {
+        if (method != "GET") {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e); return;
+        }
+        sendRestResponse(socket, 200, buildInfoJson());
+        return;
+    }
+
+    // --- GET /api/v1/radio/status ---
+    if (p == "/api/v1/radio/status") {
+        if (method != "GET") {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e); return;
+        }
+        if (!queue || !rigCaps) {
+            QJsonObject e; e["error"] = "Rig not connected";
+            sendRestResponse(socket, 503, e); return;
+        }
+        QJsonObject status = buildStatusJson();
+        status.remove("type");
+        sendRestResponse(socket, 200, status);
+        return;
+    }
+
+    // --- GET/PUT /api/v1/radio/frequency ---
+    if (p == "/api/v1/radio/frequency") {
+        if (method == "GET") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            vfoCommandType t = queue->getVfoCommand(vfoA, 0, false);
+            cacheItem freqCache = queue->getCache(t.freqFunc, 0);
+            QJsonObject resp;
+            if (freqCache.value.isValid()) {
+                freqt f = freqCache.value.value<freqt>();
+                resp["hz"] = (qint64)f.Hz;
+                resp["mhz"] = f.MHzDouble;
+            }
+            sendRestResponse(socket, 200, resp);
+        } else if (method == "PUT") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject obj = parseBody();
+            if (!obj.contains("hz")) {
+                QJsonObject e; e["error"] = "Missing field: hz";
+                sendRestResponse(socket, 400, e); return;
+            }
+            quint64 hz = obj["hz"].toVariant().toULongLong();
+            if (hz == 0) {
+                QJsonObject e; e["error"] = "Invalid frequency";
+                sendRestResponse(socket, 400, e); return;
+            }
+            freqt f;
+            f.Hz = hz;
+            f.MHzDouble = hz / 1.0E6;
+            f.VFO = activeVFO;
+            vfoCommandType t = queue->getVfoCommand(vfoA, 0, true);
+            queue->addUnique(priorityImmediate, queueItem(t.freqFunc, QVariant::fromValue<freqt>(f), false, 0));
+            QJsonObject resp; resp["status"] = "accepted";
+            sendRestResponse(socket, 202, resp);
+        } else {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e);
+        }
+        return;
+    }
+
+    // --- GET/PUT /api/v1/radio/mode ---
+    if (p == "/api/v1/radio/mode") {
+        if (method == "GET") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            vfoCommandType t = queue->getVfoCommand(vfoA, 0, false);
+            cacheItem modeCache = queue->getCache(t.modeFunc, 0);
+            QJsonObject resp;
+            if (modeCache.value.isValid()) {
+                modeInfo m = modeCache.value.value<modeInfo>();
+                resp["mode"] = modeToString(m);
+                resp["filter"] = m.filter;
+            }
+            sendRestResponse(socket, 200, resp);
+        } else if (method == "PUT") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject obj = parseBody();
+            if (!obj.contains("mode")) {
+                QJsonObject e; e["error"] = "Missing field: mode";
+                sendRestResponse(socket, 400, e); return;
+            }
+            modeInfo m = stringToMode(obj["mode"].toString());
+            if (m.mk == modeUnknown) {
+                QJsonObject e; e["error"] = "Unknown mode";
+                sendRestResponse(socket, 400, e); return;
+            }
+            if (obj.contains("filter")) {
+                int filt = obj["filter"].toInt();
+                if (filt >= 1 && filt <= 3) m.filter = filt;
+            }
+            vfoCommandType t = queue->getVfoCommand(vfoA, 0, true);
+            queue->addUnique(priorityImmediate, queueItem(t.modeFunc, QVariant::fromValue<modeInfo>(m), false, 0));
+            QJsonObject resp; resp["status"] = "accepted";
+            sendRestResponse(socket, 202, resp);
+        } else {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e);
+        }
+        return;
+    }
+
+    // --- GET/PUT /api/v1/radio/vfo ---
+    if (p == "/api/v1/radio/vfo") {
+        if (method == "GET") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject resp;
+            vfoCommandType tA = queue->getVfoCommand(vfoA, 0, false);
+            cacheItem freqA = queue->getCache(tA.freqFunc, 0);
+            if (freqA.value.isValid()) resp["vfoA"] = (qint64)freqA.value.value<freqt>().Hz;
+            vfoCommandType tB = queue->getVfoCommand(vfoB, 0, false);
+            cacheItem freqB = queue->getCache(tB.freqFunc, 0);
+            if (freqB.value.isValid()) resp["vfoB"] = (qint64)freqB.value.value<freqt>().Hz;
+            sendRestResponse(socket, 200, resp);
+        } else if (method == "PUT") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject obj = parseBody();
+            if (obj.contains("action")) {
+                QString action = obj["action"].toString();
+                if (action == "swap") {
+                    queue->add(priorityImmediate, funcVFOSwapAB, false, false);
+                    requestVfoUpdate();
+                    QJsonObject resp; resp["status"] = "accepted";
+                    sendRestResponse(socket, 202, resp);
+                } else if (action == "equalize") {
+                    queue->add(priorityImmediate, funcVFOEqualAB, false, false);
+                    requestVfoUpdate();
+                    QJsonObject resp; resp["status"] = "accepted";
+                    sendRestResponse(socket, 202, resp);
+                } else {
+                    QJsonObject e; e["error"] = "Unknown action (use swap or equalize)";
+                    sendRestResponse(socket, 400, e);
+                }
+            } else if (obj.contains("active")) {
+                QString vfoName = obj["active"].toString();
+                vfo_t v = (vfoName == "B") ? vfoB : vfoA;
+                queue->addUnique(priorityImmediate, queueItem(funcSelectVFO, QVariant::fromValue<vfo_t>(v), false));
+                requestVfoUpdate();
+                QJsonObject resp; resp["status"] = "accepted";
+                sendRestResponse(socket, 202, resp);
+            } else {
+                QJsonObject e; e["error"] = "Missing field: active or action";
+                sendRestResponse(socket, 400, e);
+            }
+        } else {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e);
+        }
+        return;
+    }
+
+    // --- GET/PUT /api/v1/radio/ptt ---
+    if (p == "/api/v1/radio/ptt") {
+        if (method == "GET") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            cacheItem txStatus = queue->getCache(funcTransceiverStatus, 0);
+            QJsonObject resp;
+            if (txStatus.value.isValid()) resp["transmitting"] = txStatus.value.toBool();
+            sendRestResponse(socket, 200, resp);
+        } else if (method == "PUT") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject obj = parseBody();
+            if (!obj.contains("transmitting")) {
+                QJsonObject e; e["error"] = "Missing field: transmitting";
+                sendRestResponse(socket, 400, e); return;
+            }
+            bool on = obj["transmitting"].toBool();
+            queue->add(priorityImmediate, queueItem(funcTransceiverStatus, QVariant::fromValue<bool>(on), false, uchar(0)));
+            QJsonObject resp; resp["status"] = "accepted";
+            sendRestResponse(socket, 202, resp);
+        } else {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e);
+        }
+        return;
+    }
+
+    // --- GET /api/v1/radio/meters ---
+    if (p == "/api/v1/radio/meters") {
+        if (method != "GET") {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e); return;
+        }
+        if (!queue || !rigCaps) {
+            QJsonObject e; e["error"] = "Rig not connected";
+            sendRestResponse(socket, 503, e); return;
+        }
+        QJsonObject resp;
+        cacheItem smeter = queue->getCache(funcSMeter, 0);
+        if (smeter.value.isValid()) resp["sMeter"] = smeter.value.toDouble();
+        cacheItem power = queue->getCache(funcPowerMeter, 0);
+        if (power.value.isValid()) resp["powerMeter"] = power.value.toDouble();
+        cacheItem swr = queue->getCache(funcSWRMeter, 0);
+        if (swr.value.isValid()) resp["swrMeter"] = swr.value.toDouble();
+        sendRestResponse(socket, 200, resp);
+        return;
+    }
+
+    // --- GET/PUT /api/v1/radio/gains ---
+    if (p == "/api/v1/radio/gains") {
+        if (method == "GET") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject resp;
+            cacheItem afGain = queue->getCache(funcAfGain, 0);
+            if (afGain.value.isValid()) resp["afGain"] = afGain.value.toInt();
+            cacheItem rfGain = queue->getCache(funcRfGain, 0);
+            if (rfGain.value.isValid()) resp["rfGain"] = rfGain.value.toInt();
+            cacheItem rfPower = queue->getCache(funcRFPower, 0);
+            if (rfPower.value.isValid()) resp["rfPower"] = rfPower.value.toInt();
+            cacheItem squelch = queue->getCache(funcSquelch, 0);
+            if (squelch.value.isValid()) resp["squelch"] = squelch.value.toInt();
+            sendRestResponse(socket, 200, resp);
+        } else if (method == "PUT") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject obj = parseBody();
+            if (obj.isEmpty()) {
+                QJsonObject e; e["error"] = "Empty or invalid JSON body";
+                sendRestResponse(socket, 400, e); return;
+            }
+            if (obj.contains("afGain")) {
+                ushort val = static_cast<ushort>(qBound(0, obj["afGain"].toInt(), 255));
+                queue->addUnique(priorityImmediate, queueItem(funcAfGain, QVariant::fromValue<ushort>(val), false, 0));
+            }
+            if (obj.contains("rfGain")) {
+                ushort val = static_cast<ushort>(qBound(0, obj["rfGain"].toInt(), 255));
+                queue->addUnique(priorityImmediate, queueItem(funcRfGain, QVariant::fromValue<ushort>(val), false, 0));
+            }
+            if (obj.contains("rfPower")) {
+                ushort val = static_cast<ushort>(qBound(0, obj["rfPower"].toInt(), 255));
+                queue->addUnique(priorityImmediate, queueItem(funcRFPower, QVariant::fromValue<ushort>(val), false, 0));
+            }
+            if (obj.contains("squelch")) {
+                ushort val = static_cast<ushort>(qBound(0, obj["squelch"].toInt(), 255));
+                queue->addUnique(priorityImmediate, queueItem(funcSquelch, QVariant::fromValue<ushort>(val), false, 0));
+            }
+            QJsonObject resp; resp["status"] = "accepted";
+            sendRestResponse(socket, 202, resp);
+        } else {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e);
+        }
+        return;
+    }
+
+    // --- GET/PUT /api/v1/radio/rx ---
+    if (p == "/api/v1/radio/rx") {
+        if (method == "GET") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject resp;
+            cacheItem preamp = queue->getCache(funcPreamp, 0);
+            if (preamp.value.isValid()) resp["preamp"] = preamp.value.toInt();
+            cacheItem att = queue->getCache(funcAttenuator, 0);
+            if (att.value.isValid()) resp["attenuator"] = att.value.toInt();
+            cacheItem nb = queue->getCache(funcNoiseBlanker, 0);
+            if (nb.value.isValid()) resp["nb"] = nb.value.toBool();
+            cacheItem nr = queue->getCache(funcNoiseReduction, 0);
+            if (nr.value.isValid()) resp["nr"] = nr.value.toBool();
+            cacheItem agc = queue->getCache(funcAGC, 0);
+            if (agc.value.isValid()) resp["agc"] = agc.value.toInt();
+            cacheItem anf = queue->getCache(funcAutoNotch, 0);
+            if (anf.value.isValid()) resp["autoNotch"] = anf.value.toBool();
+            cacheItem fw = queue->getCache(funcFilterWidth, 0);
+            if (fw.value.isValid()) resp["filterWidth"] = fw.value.toInt();
+            sendRestResponse(socket, 200, resp);
+        } else if (method == "PUT") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject obj = parseBody();
+            if (obj.isEmpty()) {
+                QJsonObject e; e["error"] = "Empty or invalid JSON body";
+                sendRestResponse(socket, 400, e); return;
+            }
+            if (obj.contains("preamp")) {
+                uchar val = static_cast<uchar>(qBound(0, obj["preamp"].toInt(), 255));
+                queue->addUnique(priorityImmediate, queueItem(funcPreamp, QVariant::fromValue<uchar>(val), false, 0));
+            }
+            if (obj.contains("attenuator")) {
+                ushort val = static_cast<ushort>(qBound(0, obj["attenuator"].toInt(), 255));
+                queue->addUnique(priorityImmediate, queueItem(funcAttenuator, QVariant::fromValue<ushort>(val), false, 0));
+            }
+            if (obj.contains("nb")) {
+                uchar val = obj["nb"].toBool() ? 1 : 0;
+                queue->addUnique(priorityImmediate, queueItem(funcNoiseBlanker, QVariant::fromValue<uchar>(val), false, 0));
+            }
+            if (obj.contains("nr")) {
+                uchar val = obj["nr"].toBool() ? 1 : 0;
+                queue->addUnique(priorityImmediate, queueItem(funcNoiseReduction, QVariant::fromValue<uchar>(val), false, 0));
+            }
+            if (obj.contains("agc")) {
+                uchar val = static_cast<uchar>(qBound(0, obj["agc"].toInt(), 255));
+                queue->add(priorityImmediate, queueItem(funcAGC, QVariant::fromValue<uchar>(val), false, 0));
+            }
+            if (obj.contains("autoNotch")) {
+                uchar val = obj["autoNotch"].toBool() ? 1 : 0;
+                queue->addUnique(priorityImmediate, queueItem(funcAutoNotch, QVariant::fromValue<uchar>(val), false, 0));
+            }
+            if (obj.contains("filterWidth")) {
+                ushort val = static_cast<ushort>(qBound(0, obj["filterWidth"].toInt(), 10000));
+                queue->addUnique(priorityImmediate, queueItem(funcFilterWidth, QVariant::fromValue<ushort>(val), false, 0));
+            }
+            QJsonObject resp; resp["status"] = "accepted";
+            sendRestResponse(socket, 202, resp);
+        } else {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e);
+        }
+        return;
+    }
+
+    // --- GET/PUT /api/v1/radio/tx ---
+    if (p == "/api/v1/radio/tx") {
+        if (method == "GET") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject resp;
+            cacheItem split = queue->getCache(funcSplitStatus, 0);
+            if (split.value.isValid()) resp["split"] = split.value.toBool();
+            cacheItem tuner = queue->getCache(funcTunerStatus, 0);
+            if (tuner.value.isValid()) resp["tuner"] = tuner.value.toInt();
+            cacheItem comp = queue->getCache(funcCompressor, 0);
+            if (comp.value.isValid()) resp["compressor"] = comp.value.toBool();
+            cacheItem mon = queue->getCache(funcMonitor, 0);
+            if (mon.value.isValid()) resp["monitor"] = mon.value.toBool();
+            sendRestResponse(socket, 200, resp);
+        } else if (method == "PUT") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject obj = parseBody();
+            if (obj.isEmpty()) {
+                QJsonObject e; e["error"] = "Empty or invalid JSON body";
+                sendRestResponse(socket, 400, e); return;
+            }
+            if (obj.contains("split")) {
+                uchar val = obj["split"].toBool() ? 1 : 0;
+                queue->add(priorityImmediate, queueItem(funcSplitStatus, QVariant::fromValue<uchar>(val), false, 0));
+            }
+            if (obj.contains("tuner")) {
+                uchar val = static_cast<uchar>(qBound(0, obj["tuner"].toInt(), 2));
+                queue->addUnique(priorityImmediate, queueItem(funcTunerStatus, QVariant::fromValue<uchar>(val), false, 0));
+            }
+            if (obj.contains("compressor")) {
+                uchar val = obj["compressor"].toBool() ? 1 : 0;
+                queue->add(priorityImmediate, queueItem(funcCompressor, QVariant::fromValue<uchar>(val), false, 0));
+            }
+            if (obj.contains("monitor")) {
+                uchar val = obj["monitor"].toBool() ? 1 : 0;
+                queue->add(priorityImmediate, queueItem(funcMonitor, QVariant::fromValue<uchar>(val), false, 0));
+            }
+            QJsonObject resp; resp["status"] = "accepted";
+            sendRestResponse(socket, 202, resp);
+        } else {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e);
+        }
+        return;
+    }
+
+    // --- POST/DELETE /api/v1/radio/cw ---
+    if (p == "/api/v1/radio/cw") {
+        if (method == "POST") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            QJsonObject obj = parseBody();
+            if (!obj.contains("text")) {
+                QJsonObject e; e["error"] = "Missing field: text";
+                sendRestResponse(socket, 400, e); return;
+            }
+            QString text = obj["text"].toString();
+            if (text.isEmpty()) {
+                QJsonObject e; e["error"] = "Empty CW text";
+                sendRestResponse(socket, 400, e); return;
+            }
+            if (obj.contains("wpm")) {
+                ushort wpm = static_cast<ushort>(qBound(6, obj["wpm"].toInt(), 48));
+                queue->add(priorityImmediate, queueItem(funcKeySpeed, QVariant::fromValue<ushort>(wpm), false, 0));
+            }
+            queue->add(priorityImmediate, queueItem(funcSendCW, QVariant::fromValue<QString>(text)));
+            QJsonObject resp; resp["status"] = "accepted";
+            sendRestResponse(socket, 202, resp);
+        } else if (method == "DELETE") {
+            if (!queue || !rigCaps) {
+                QJsonObject e; e["error"] = "Rig not connected";
+                sendRestResponse(socket, 503, e); return;
+            }
+            queue->add(priorityImmediate, queueItem(funcSendCW, QVariant::fromValue<QString>(QString())));
+            QJsonObject resp; resp["status"] = "accepted";
+            sendRestResponse(socket, 202, resp);
+        } else {
+            QJsonObject e; e["error"] = "Method not allowed";
+            sendRestResponse(socket, 405, e);
+        }
+        return;
+    }
+
+    // 404 for unknown paths
+    QJsonObject e; e["error"] = "Unknown API endpoint";
+    sendRestResponse(socket, 404, e);
 }
 
 // --- WebSocket ---
@@ -713,11 +1268,9 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
     }
 }
 
-void webServer::sendCurrentState(QWebSocket *client)
+QJsonObject webServer::buildInfoJson() const
 {
-    // Send rig info
     QJsonObject info;
-    info["type"] = "rigInfo";
     info["version"] = QString(WFVIEW_VERSION);
 
     if (rigCaps) {
@@ -736,8 +1289,6 @@ void webServer::sendCurrentState(QWebSocket *client)
         info["audioAvailable"] = audioConfigured;
         if (audioConfigured) {
             info["audioSampleRate"] = (int)rigSampleRate;
-        } else if (!audioErrorReason.isEmpty()) {
-            info["audioError"] = audioErrorReason;
         }
         info["txAudioAvailable"] = txAudioConfigured;
         if (!rigCaps->scopeCenterSpans.empty()) {
@@ -754,25 +1305,35 @@ void webServer::sendCurrentState(QWebSocket *client)
         if (!rigCaps->preamps.empty()) {
             QJsonArray preamps;
             for (const genericType &p : rigCaps->preamps) {
-                QJsonObject obj;
-                obj["num"] = p.num;
-                obj["name"] = p.name;
-                preamps.append(obj);
+                QJsonObject po;
+                po["num"] = p.num;
+                po["name"] = p.name;
+                preamps.append(po);
             }
             info["preamps"] = preamps;
         }
         if (!rigCaps->filters.empty()) {
             QJsonArray filters;
             for (const filterType &f : rigCaps->filters) {
-                QJsonObject obj;
-                obj["num"] = f.num;
-                obj["name"] = f.name;
-                filters.append(obj);
+                QJsonObject fo;
+                fo["num"] = f.num;
+                fo["name"] = f.name;
+                filters.append(fo);
             }
             info["filters"] = filters;
         }
     } else {
         info["connected"] = false;
+    }
+    return info;
+}
+
+void webServer::sendCurrentState(QWebSocket *client)
+{
+    QJsonObject info = buildInfoJson();
+    info["type"] = "rigInfo";
+    if (!audioConfigured && !audioErrorReason.isEmpty()) {
+        info["audioError"] = audioErrorReason;
     }
     sendJsonTo(client, info);
 
