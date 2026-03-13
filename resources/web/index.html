@@ -1807,7 +1807,6 @@ body.digi-open .digi-bar {
                 <button id="digiCqOnlyBtn" class="digi-toggle-btn">CQ ONLY</button>
                 <button id="digiRxToggle" class="digi-rx-toggle active">RX ON</button>
                 <button id="digiSettingsBtn" class="digi-settings-btn" title="Settings">&#9881;</button>
-                <button id="digiLogBtn" class="digi-log-btn" title="QSO Log">Log</button>
                 <button id="digiCloseBtn" class="digi-close-btn">&#x2715;</button>
             </div>
 
@@ -5993,6 +5992,12 @@ function renderDigiLog() {
 }
 
 function editDigiQso(idx) {
+    // If we were editing a blank new entry, remove it
+    if (digiLogEditIdx >= 0 && digiLogEditIdx !== idx && qsoLog[digiLogEditIdx] && !qsoLog[digiLogEditIdx].call) {
+        qsoLog.splice(digiLogEditIdx, 1);
+        try { localStorage.setItem('qsoLog', JSON.stringify(qsoLog.slice(0, 500))); } catch(e) {}
+        if (idx > digiLogEditIdx) idx--;
+    }
     digiLogEditIdx = idx;
     renderDigiLog();
     // Focus the callsign field for convenience
@@ -6285,10 +6290,6 @@ function initDigiHandlers() {
             if (digiBarVisible) toggleDigiBar();
         });
     }
-
-    // Log modal open button (in DIGI panel)
-    var logBtn = document.getElementById('digiLogBtn');
-    if (logBtn) { logBtn.addEventListener('click', openLogModal); }
 
     // Log modal close button
     var logCloseBtn = document.getElementById('digiLogCloseBtn');
