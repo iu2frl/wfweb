@@ -2376,6 +2376,9 @@ function updateMode(mode) {
         document.getElementById('cwBar').classList.add('hidden');
     }
 
+    // Hide DIGI panel if switching to non-USB mode
+    if (mode !== 'USB' && digiBarVisible) toggleDigiBar();
+
     renderBottomBar(); // Update PTT/KEY button
 }
 
@@ -2771,7 +2774,9 @@ function setPanel(name) {
             cwBarSuspended = false;
         }
         if (digiBarSuspended) {
-            document.getElementById('digiBar').classList.remove('hidden');
+            if (digiBarVisible) {
+                document.getElementById('digiBar').classList.remove('hidden');
+            }
             digiBarSuspended = false;
         }
     } else {
