@@ -6,6 +6,33 @@ a built-in web interface. See https://gitlab.com/eliggett/wfview for the
 upstream wfview history.
 
 
+v0.2.4 (2026-03-13)
+--------------------
+
+DIGI panel (FT8/FT4):
+- Waterfall scroll speed reduced 4x for better readability
+- Horizontal separator lines drawn at time slot boundaries
+- TX/RX markers now show full signal bandwidth as semi-transparent bands
+  instead of thin 3px lines; TX band turns red when armed
+- Callsign labels moved to top of waterfall (below TX/RX indicators) and
+  persist for 5 time slots; cleared on band change
+- Fix callsign label frequency offset (~15 Hz) — labels now centered on
+  the actual signal position
+- ALC meter and auto-gain control for FT8/FT4 TX: gain is reduced
+  automatically when ALC exceeds threshold
+- Local TX monitor volume reduced to avoid clipping
+- DIGI panel stays open during rig-initiated mode changes
+- Removed separate DIGI Log button (use shared QSO Log instead)
+
+Web UI:
+- Shared QSO log panel for CW, SSB, and FT8/FT4 with editable fields
+- Filter settings panel with bandwidth, PBT, and filter shape controls
+- MIC GAIN slider added to the GAIN panel
+- Fix duplicate CW progress bar when re-clicking a memory button
+- Fix DIGI panel visibility on mode change and panel restore
+- Fix blank entry appearing on QSO log edit
+
+
 v0.2.3 (2026-03-08)
 --------------------
 
