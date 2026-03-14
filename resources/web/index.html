@@ -2430,6 +2430,7 @@ function handleMessage(msg) {
             if (msg.sMeter !== undefined) updateSMeter(msg.sMeter);
             if (msg.powerMeter !== undefined) updatePowerMeter(msg.powerMeter);
             if (msg.swrMeter !== undefined) updateSwrMeter(msg.swrMeter);
+            if (msg.alcMeter !== undefined) updateALCMeter(msg.alcMeter);
             if (msg.transmitting !== undefined) updateTxStatus(msg.transmitting);
             if (msg.afGain !== undefined) updateSlider('afGain', msg.afGain);
             if (msg.rfGain !== undefined) updateSlider('rfGain', msg.rfGain);
@@ -2452,6 +2453,7 @@ function handleMessage(msg) {
             if (msg.sMeter !== undefined) updateSMeter(msg.sMeter);
             if (msg.powerMeter !== undefined) updatePowerMeter(msg.powerMeter);
             if (msg.swrMeter !== undefined) updateSwrMeter(msg.swrMeter);
+            if (msg.alcMeter !== undefined) updateALCMeter(msg.alcMeter);
             break;
         case 'error':
             console.error('Server error:', msg.message);
@@ -2828,9 +2830,29 @@ var METER_RED  = '#cc2222';     // segments above S9
 var METER_DARK = '#1c1c1c';     // inactive segment
 var METER_BASELINE = '#999';    // thin white line under segments
 
+var alcVal = 0;
+var digiTxGain = 1.0;          // FT8/FT4 audio gain multiplier (reduced by ALC feedback)
+var ALC_THRESHOLD = 0.05;      // ALC value above which we start reducing gain (scale 0-1-2)
+var ALC_STEP_DOWN = 0.02;      // gain reduction per ALC update when over threshold
+var ALC_STEP_UP = 0.005;       // gain recovery per ALC update when under threshold
+var ALC_MIN_GAIN = 0.05;       // minimum gain floor
+
 function updateSMeter(val) { meterVal = val; if (!isTransmitting) drawMeter(); }
 function updatePowerMeter(val) { powerVal = val; if (isTransmitting) drawMeter(); }
 function updateSwrMeter(val) { swrVal = val; if (isTransmitting) drawMeter(); }
+function updateALCMeter(val) {
+    alcVal = val;
+    if (isTransmitting) drawMeter();
+    // Auto-adjust FT8/FT4 TX gain based on ALC
+    if (digiTxActive && isTransmitting) {
+        if (alcVal > ALC_THRESHOLD) {
+            digiTxGain = Math.max(ALC_MIN_GAIN, digiTxGain - ALC_STEP_DOWN);
+            console.log('[ALC] reducing digiTxGain to ' + digiTxGain.toFixed(3) + ' (ALC=' + alcVal.toFixed(2) + ')');
+        } else if (digiTxGain < 1.0) {
+            digiTxGain = Math.min(1.0, digiTxGain + ALC_STEP_UP);
+        }
+    }
+}
 
 function drawMeter() {
     var canvas = document.getElementById('meterCanvas');
@@ -3025,6 +3047,19 @@ function drawTxMeters(ctx, cw, ch, barX, barW, segW, segGap, segX, labelW) {
         valueText: swrVal.toFixed(1),
         segW: segW, segGap: segGap, segX: segX
     });
+
+    // ALC indicator — visible during DIGI TX
+    if (digiTxActive) {
+        var alcPct = Math.round(alcVal * 100);
+        var alcColor = alcVal > ALC_THRESHOLD ? '#ff4444' : '#44cc44';
+        var alcText = 'ALC ' + alcPct + '%';
+        if (digiTxGain < 1.0) alcText += ' G' + Math.round(digiTxGain * 100) + '%';
+        ctx.fillStyle = alcColor;
+        ctx.font = 'bold 9px system-ui, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(alcText, cw - 2, ch - 1);
+    }
 }
 
 // Generic segmented meter bar (used for Po, SWR in TX mode)
@@ -6001,6 +6036,14 @@ function streamDigiAudio(samples12k, onDone, onFirstChunk) {
             console.warn('[DIGI stream] sendInt16Chunk: WS not open (state=' +
                          (ws ? ws.readyState : 'null') + ') chunk#' + (chunksSent + 1));
             return;
+        }
+        // Apply ALC-controlled gain reduction
+        if (digiTxGain < 1.0) {
+            var samples = new Int16Array(i16buf);
+            for (var g = 0; g < samples.length; g++) {
+                samples[g] = (samples[g] * digiTxGain) | 0;
+            }
+            i16buf = samples.buffer;
         }
         var frame = new ArrayBuffer(6 + i16buf.byteLength);
         var dv = new DataView(frame);

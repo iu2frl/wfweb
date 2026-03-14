@@ -676,6 +676,8 @@ void webServer::handleRestRequest(QTcpSocket *socket, const QString &method,
         if (power.value.isValid()) resp["powerMeter"] = power.value.toDouble();
         cacheItem swr = queue->getCache(funcSWRMeter, 0);
         if (swr.value.isValid()) resp["swrMeter"] = swr.value.toDouble();
+        cacheItem alc = queue->getCache(funcALCMeter, 0);
+        if (alc.value.isValid()) resp["alcMeter"] = alc.value.toDouble();
         sendRestResponse(socket, 200, resp);
         return;
     }
@@ -1084,6 +1086,12 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
     else if (type == "setPTT") {
         bool on = cmd["value"].toBool();
         queue->add(priorityImmediate, queueItem(funcTransceiverStatus, QVariant::fromValue<bool>(on), false, uchar(0)));
+        // Start/stop ALC meter polling for web clients
+        if (on) {
+            queue->addUnique(priorityHighest, queueItem(funcALCMeter, true, 0));
+        } else {
+            queue->del(funcALCMeter, 0);
+        }
     }
     else if (type == "setAfGain") {
         ushort val = static_cast<ushort>(qBound(0, cmd["value"].toInt(), 255));
@@ -1445,6 +1453,12 @@ QJsonObject webServer::buildStatusJson()
         status["swrMeter"] = swr.value.toDouble();
     }
 
+    // ALC
+    cacheItem alc = queue->getCache(funcALCMeter, 0);
+    if (alc.value.isValid()) {
+        status["alcMeter"] = alc.value.toDouble();
+    }
+
     // TX status
     cacheItem txStatus = queue->getCache(funcTransceiverStatus, 0);
     if (txStatus.value.isValid()) {
@@ -1578,6 +1592,9 @@ void webServer::receiveCache(cacheItem item)
         break;
     case funcSWRMeter:
         update["swrMeter"] = item.value.toDouble();
+        break;
+    case funcALCMeter:
+        update["alcMeter"] = item.value.toDouble();
         break;
     case funcTransceiverStatus:
         update["transmitting"] = item.value.toBool();
