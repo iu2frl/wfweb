@@ -2691,12 +2691,13 @@ function renderFilterOverlay() {
 }
 
 function updateTxStatus(tx) {
+    var changed = (isTransmitting !== tx);
     isTransmitting = tx;
     var ind = document.getElementById('txIndicator');
     ind.textContent = tx ? 'TX' : 'RX';
     ind.classList.toggle('tx', tx);
     drawMeter();
-    renderBottomBar();
+    if (changed) renderBottomBar();
 }
 
 function updateSplit(on) {
