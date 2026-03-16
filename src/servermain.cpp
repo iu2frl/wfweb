@@ -387,7 +387,7 @@ void servermain::receiveRigCaps(rigCapabilities* rigCaps)
                 if (rigCaps->commands.contains(funcSWRMeter))
                     queue->addUnique(priorityHighest, queueItem(funcSWRMeter, true, 0));
                 if (rigCaps->commands.contains(funcALCMeter))
-                    queue->addUnique(priorityHighest, queueItem(funcALCMeter, true, 0));
+                    queue->addUnique(priorityHigh, queueItem(funcALCMeter, true, 0));
 
                 // Gains and settings
                 if (rigCaps->commands.contains(funcAfGain))
