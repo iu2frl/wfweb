@@ -6,8 +6,9 @@ wfweb provides prebuilt packages for the following platforms, available on the [
 |---|---|
 | `wfweb_<version>_amd64.deb` | Ubuntu / Debian x86_64 |
 | `wfweb_<version>_arm64.deb` | Raspberry Pi / Linux ARM64 |
+| `wfweb-windows-x86_64.zip` | Windows x86_64 |
 
-If your platform is not listed, see [INSTALL.md](INSTALL.md) for build-from-source instructions.
+If your platform is not listed, see [BUILDING.md](BUILDING.md) for build-from-source instructions.
 
 ---
 
@@ -35,6 +36,12 @@ sudo apt install ./wfweb_<version>_arm64.deb
 
 ---
 
+## Windows
+
+Download the latest `wfweb-windows-x86_64.zip` from the [releases page](https://github.com/adecarolis/wfweb/releases), extract it, and run `wfweb.exe` from the extracted directory. The ZIP is self-contained with all required DLLs.
+
+---
+
 ## After installing
 
 Before running wfweb for the first time, create a configuration file for your radio. See the [Quick start](README.md#quick-start-headless-ic-7300-via-usb) section in the README for details.
@@ -42,10 +49,10 @@ Before running wfweb for the first time, create a configuration file for your ra
 Then start wfweb manually:
 
 ~~~
-wfview
+wfweb
 ~~~
 
-The binary is named `wfview` (inherited from upstream). Open your browser at `https://<hostname>:8080` and accept the self-signed certificate warning on first visit.
+Open your browser at `https://<hostname>:8080` and accept the self-signed certificate warning on first visit.
 
 ### Autostart with systemd
 
