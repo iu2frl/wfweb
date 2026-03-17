@@ -1,0 +1,96 @@
+# Building wfweb
+
+## Linux (Ubuntu/Debian)
+
+### Prerequisites
+
+```bash
+sudo apt-get install -y \
+    qt5-qmake qtbase5-dev libqt5serialport5-dev \
+    qtmultimedia5-dev libqt5websockets5-dev \
+    libqt5gamepad5-dev libqt5printsupport5 \
+    libopus-dev libeigen3-dev \
+    portaudio19-dev librtaudio-dev \
+    libhidapi-dev libudev-dev libpulse-dev \
+    libqcustomplot-dev \
+    openssl
+```
+
+### Build
+
+```bash
+qmake wfweb.pro
+make -j$(nproc)
+```
+
+### Install
+
+```bash
+sudo make install
+```
+
+This installs the binary, rig files, and a systemd service unit. To start at boot:
+
+```bash
+sudo systemctl enable --now wfweb@$USER
+```
+
+### Build a .deb package
+
+See `.github/workflows/build.yml` for the full packaging steps.
+
+## Windows
+
+### Prerequisites
+
+| Dependency | Version | Location |
+|---|---|---|
+| Visual Studio 2022 Build Tools | 17.x | `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools` |
+| Qt | 5.15.2 (msvc2019_64) | `C:\Qt\5.15.2\msvc2019_64` |
+| vcpkg packages | opus, portaudio, hidapi, openssl | `C:\vcpkg\installed\x64-windows` |
+
+#### vcpkg packages
+
+```
+vcpkg install opus:x64-windows portaudio:x64-windows hidapi:x64-windows openssl:x64-windows
+```
+
+### Build
+
+Open any terminal (cmd, PowerShell, Git Bash, MSYS2) and run:
+
+```
+build.bat              # Incremental release build
+build.bat clean        # Clean all artifacts, then rebuild
+build.bat cleanonly    # Clean all artifacts without rebuilding
+```
+
+From MSYS2/Git Bash/Claude Code, use:
+```bash
+cmd //c ".\\build.bat"          # runs in background from MSYS perspective
+tail -f build.log               # watch progress (in another terminal or after)
+```
+
+All build output goes to `build.log`. The last line is `EXIT:0` (success) or `EXIT:1` (failure).
+
+### Output
+
+The self-contained deployment directory is `wfweb-release\`, containing:
+- `wfweb.exe` — the server binary
+- Qt runtime DLLs and plugins (deployed via `windeployqt`)
+- vcpkg DLLs (portaudio, opus, hidapi, OpenSSL)
+- `rigs\` — rig definition files
+
+### What "clean" removes
+
+- `Makefile`, `Makefile.Debug`, `Makefile.Release`, `.qmake.stash`
+- `release/`, `debug/` (intermediate object files)
+- `wfweb-release/`, `wfweb-debug/` (output directories)
+
+## Notes
+
+- The project file is `wfweb.pro`.
+- Builds are **incremental by default** — only modified files are recompiled.
+- If you change the `.pro` file, qmake regenerates the Makefiles automatically on the next build.
+- If you get stale object errors or linker issues, clean and rebuild.
+- On Windows, `windeployqt` runs automatically to deploy Qt DLLs, making the output directory portable.

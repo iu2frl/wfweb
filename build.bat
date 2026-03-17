@@ -42,8 +42,8 @@ if exist Makefile nmake clean > nul 2>&1
 del /q Makefile Makefile.Debug Makefile.Release .qmake.stash 2>nul
 rd /s /q release 2>nul
 rd /s /q debug 2>nul
-rd /s /q wfweb 2>nul
-rd /s /q wfserver-debug 2>nul
+rd /s /q wfweb-release 2>nul
+rd /s /q wfweb-debug 2>nul
 echo Clean done. >> %LOG%
 goto :build
 
@@ -53,15 +53,15 @@ if exist Makefile nmake clean > nul 2>&1
 del /q Makefile Makefile.Debug Makefile.Release .qmake.stash 2>nul
 rd /s /q release 2>nul
 rd /s /q debug 2>nul
-rd /s /q wfweb 2>nul
-rd /s /q wfserver-debug 2>nul
+rd /s /q wfweb-release 2>nul
+rd /s /q wfweb-debug 2>nul
 echo Clean done. >> %LOG%
 echo EXIT:0 >> %LOG%
 exit /b 0
 
 :build
 echo === qmake === >> %LOG%
-"%QTDIR%\bin\qmake.exe" wfserver.pro CONFIG+=release "VCPKG_DIR=%VCPKG%" >> %LOG% 2>&1
+"%QTDIR%\bin\qmake.exe" wfweb.pro CONFIG+=release "VCPKG_DIR=%VCPKG%" >> %LOG% 2>&1
 if errorlevel 1 (
     echo ERROR: qmake failed >> %LOG%
     echo EXIT:1 >> %LOG%
@@ -76,9 +76,18 @@ if errorlevel 1 (
     exit /b 1
 )
 
+:: --- Deploy Qt runtime ---
+echo === windeployqt === >> %LOG%
+set OUTDIR=%SRCDIR%\wfweb-release
+"%QTDIR%\bin\windeployqt.exe" --release --no-translations --no-opengl-sw "%OUTDIR%\wfweb.exe" >> %LOG% 2>&1
+if errorlevel 1 (
+    echo ERROR: windeployqt failed >> %LOG%
+    echo EXIT:1 >> %LOG%
+    exit /b 1
+)
+
 :: --- Deploy runtime DLLs ---
-echo === Deploying runtime DLLs === >> %LOG%
-set OUTDIR=%SRCDIR%\wfweb
+echo === Deploying vcpkg DLLs === >> %LOG%
 set VCPKG_BIN=%VCPKG:/=\%\bin
 
 :: vcpkg DLLs (portaudio, opus, hidapi, OpenSSL)
@@ -110,6 +119,6 @@ if not exist "%OUTDIR%\rigs" mkdir "%OUTDIR%\rigs"
 copy /y "%SRCDIR%\rigs\*.rig" "%OUTDIR%\rigs\" >> %LOG% 2>&1
 echo Rig files deployed >> %LOG%
 
-echo BUILD OK: wfweb\wfweb.exe >> %LOG%
+echo BUILD OK: wfweb-release\wfweb.exe >> %LOG%
 echo EXIT:0 >> %LOG%
 exit /b 0
