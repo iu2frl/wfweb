@@ -4856,7 +4856,22 @@ function initCWHandlers() {
 
 function digiPeriod() { return digiMode === 'FT4' ? 7.5 : 15; }
 function getMyCall() { return ((document.getElementById('digiMyCall') || {}).value || '').toUpperCase(); }
-function getMyGrid() { return ((document.getElementById('digiGrid') || {}).value || 'AA00').toUpperCase(); }
+function getMyGrid() { return ((document.getElementById('digiGrid') || {}).value || '').toUpperCase().substr(0, 4); }
+
+// Check that MY CALL and MY GRID are set before transmitting.
+// Opens the settings modal and shows a status warning if not.
+// Returns true if both are set, false otherwise.
+function checkDigiCallGrid() {
+    var myCall = getMyCall();
+    var myGrid = getMyGrid();
+    if (!myCall || !myGrid) {
+        var what = !myCall && !myGrid ? 'SET CALL & GRID' : !myCall ? 'SET CALL' : 'SET GRID';
+        updateDigiStatus(what, '');
+        document.getElementById('digiSettingsModal').classList.add('visible');
+        return false;
+    }
+    return true;
+}
 function getDxCall() { return ((document.getElementById('digiDxCall') || {}).value || '').toUpperCase(); }
 
 // Creates and resumes the shared TX AudioContext during a user gesture.
@@ -5737,6 +5752,7 @@ function digiRowDblClick(el) {
 
 // Double-click on a message row: enable TX (if needed) AND arm the message immediately.
 function digiMsgRowDblClick(step) {
+    if (!checkDigiCallGrid()) return;
     var msgs = getDigiMsgTexts();
     var msg = msgs[step];
     if (!msg || msg === '\u2014') { console.warn('[DIGI] dblclick: msg row ' + (step+1) + ' is empty'); return; }
@@ -5766,11 +5782,11 @@ function toggleDigiCqParity() {
 
 // Start calling CQ: enable TX, arm the CQ message, use the user-selected parity
 function digiCallCq() {
+    if (!checkDigiCallGrid()) return;
     var myCall = getMyCall();
     var myGrid = getMyGrid();
-    if (!myCall) { console.warn('[DIGI] CALL CQ: MY CALL not set'); updateDigiStatus('SET CALL', ''); return; }
     initDigiTxCtx();
-    var cqMsg = 'CQ ' + myCall + (myGrid ? ' ' + myGrid : '');
+    var cqMsg = 'CQ ' + myCall + ' ' + myGrid;
     digiQsoState = 'IDLE';
     digiQsoPartner = '';
     digiTheirReport = '';
@@ -5828,6 +5844,7 @@ function armMessageForQsoState(decodedSlotIndex) {
 }
 
 function digiMsgRowClick(step) {
+    if (!checkDigiCallGrid()) return;
     if (!digiTxEnabled) {
         console.warn('[DIGI] msg row clicked but TX not enabled');
         updateDigiStatus('TX disabled', '');
@@ -5890,9 +5907,9 @@ function updateDigiMsgRows() {
 }
 
 function queueDigiCqReply(dxCall, decodedSlotIndex) {
+    if (!checkDigiCallGrid()) return;
     var myCall = getMyCall();
     var myGrid = getMyGrid();
-    if (!myCall) { console.warn('[DIGI] queueDigiCqReply: MY CALL not set'); return; }
     var reply = dxCall.toUpperCase() + ' ' + myCall + ' ' + myGrid;
     digiTxQueued = reply;
     digiTxAttempts = 0;
@@ -5917,7 +5934,7 @@ function queueDigiCqReply(dxCall, decodedSlotIndex) {
 function handleDigiAutoQso(decodes, decodedSlotIndex) {
     var myCall = getMyCall();
     var myGrid = getMyGrid();
-    if (!myCall) return;
+    if (!myCall || !myGrid) return;
 
     for (var i = 0; i < decodes.length; i++) {
         var msg = decodes[i].msg.trim().toUpperCase();
