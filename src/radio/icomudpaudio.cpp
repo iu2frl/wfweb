@@ -150,7 +150,6 @@ void icomUdpAudio::dataReceived()
 
     while (udp->hasPendingDatagrams()) {
         QNetworkDatagram datagram = udp->receiveDatagram();
-        //qInfo(logUdp()) << "Received: " << datagram.data().mid(0,10);
         QByteArray r = datagram.data();
 
         switch (r.length())

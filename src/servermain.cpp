@@ -8,8 +8,8 @@
 // This code is copyright 2017-2020 Elliott H. Liggett
 // All rights reserved
 
-servermain::servermain(const QString settingsFile, quint16 cmdLineWebPort)
-    : cmdLineWebPort(cmdLineWebPort)
+servermain::servermain(const QString settingsFile, quint16 cmdLineWebPort, bool noServer)
+    : cmdLineWebPort(cmdLineWebPort), noServer(noServer)
 {
 
     qRegisterMetaType <udpPreferences>(); // Needs to be registered early.
@@ -128,20 +128,38 @@ void servermain::openRig()
 
     for (RIGCONFIG* radio : serverConfig.rigs)
     {
-        //qInfo(logSystem()) << "Opening rig";
         if (radio->rigThread != Q_NULLPTR)
         {
-            //qInfo(logSystem()) << "Got rig";
-            QMetaObject::invokeMethod(radio->rig, [=]() {
-                radio->rig->commSetup(rigList,radio->civAddr, radio->serialPort, radio->baudRate, QString("none"),0 ,radio->waterfallFormat);
-            }, Qt::QueuedConnection);
+            if (prefs.enableLAN) {
+                usingLAN = true;
+                udpPrefs.waterfallFormat = radio->waterfallFormat;
+                audioSetup lanRxSetup = rxSetup;
+                audioSetup lanTxSetup = txSetup;
+                memcpy(lanRxSetup.guid, radio->guid, GUIDLEN);
+                memcpy(lanTxSetup.guid, radio->guid, GUIDLEN);
+                QMetaObject::invokeMethod(radio->rig, [=]() {
+                    radio->rig->commSetup(rigList, radio->civAddr, udpPrefs,
+                        lanRxSetup, lanTxSetup, QString("none"), 0);
+                }, Qt::QueuedConnection);
+                qInfo(logSystem()) << "Connecting via LAN to" << udpPrefs.ipAddress;
+            } else {
+                QMetaObject::invokeMethod(radio->rig, [=]() {
+                    radio->rig->commSetup(rigList, radio->civAddr, radio->serialPort,
+                        radio->baudRate, QString("none"), 0, radio->waterfallFormat);
+                }, Qt::QueuedConnection);
+            }
         }
     }
 
-    // Setup USB audio for web server (serial connections use USB audio)
+    // Setup web audio
     if (web != Q_NULLPTR) {
-        QMetaObject::invokeMethod(web, "setupUsbAudio", Qt::QueuedConnection,
-            Q_ARG(quint32, 48000));
+        if (prefs.enableLAN) {
+            QMetaObject::invokeMethod(web, "setupAudio", Qt::QueuedConnection,
+                Q_ARG(quint8, rxSetup.codec), Q_ARG(quint32, rxSetup.sampleRate));
+        } else {
+            QMetaObject::invokeMethod(web, "setupUsbAudio", Qt::QueuedConnection,
+                Q_ARG(quint32, 48000));
+        }
     }
 }
 
@@ -341,8 +359,11 @@ void servermain::receiveRigCaps(rigCapabilities* rigCaps)
                 ;
             radio->rigCaps = rigCaps;
 
-            // Calculate queue interval based on baud rate, same as wfview
-            {
+            // Calculate queue interval
+            if (usingLAN) {
+                queue->interval(70);
+                qInfo(logSystem()) << "Queue interval set to 70ms (LAN mode)";
+            } else {
                 quint32 baud = prefs.serialPortBaud;
                 if (baud == 0) baud = 9600;
                 unsigned int usPerByte = 9600*1000 / baud;
@@ -437,22 +458,12 @@ void servermain::getSettingsFilePath(QString settingsFile)
     }
     else
     {
-        QString file = settingsFile;
-        QFile info(settingsFile);
-        QString path="";
-        if (!QFileInfo(info).isAbsolute())
-        {
-            path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-            if (path.isEmpty())
-            {
-                path = QDir::homePath();
-            }
-            path = path + "/";
-            file = info.fileName();
-        }
+        // Resolve relative paths against the current working directory
+        QFileInfo info(settingsFile);
+        QString resolved = info.absoluteFilePath();
 
-        qInfo(logSystem()) << "Loading settings from:" << path + file;
-        settings = new QSettings(path + file, QSettings::Format::IniFormat);
+        qInfo(logSystem()) << "Loading settings from:" << resolved;
+        settings = new QSettings(resolved, QSettings::Format::IniFormat);
     }
 }
 
@@ -469,12 +480,19 @@ void servermain::setInitialTiming()
 void servermain::setServerToPrefs()
 {
 	
+    serverConfig.lan = prefs.enableLAN;
+
     // Start server if enabled in config
     if (serverThread != Q_NULLPTR) {
         serverThread->quit();
         serverThread->wait();
         serverThread = Q_NULLPTR;
         server = Q_NULLPTR;
+    }
+
+    if (noServer) {
+        qInfo(logSystem()) << "Rig server disabled (--no-server)";
+        return;
     }
 
     serverThread = new QThread(this);
@@ -553,6 +571,8 @@ void servermain::setDefPrefs()
     txSetup.sampleRate = 48000;
     rxSetup.isinput = false;
     txSetup.isinput = true;
+    rxSetup.latency = 150;
+    txSetup.latency = 150;
 
     udpDefPrefs.ipAddress = QString("");
     udpDefPrefs.controlLANPort = 50001;
@@ -618,7 +638,7 @@ void servermain::loadSettings()
         settings->endArray();
 
         settings->beginGroup("Server");
-        settings->setValue("ServerEnabled", true);
+        settings->setValue("ServerEnabled", false);
         settings->setValue("ServerControlPort", udpDefPrefs.controlLANPort);
         settings->setValue("ServerCivPort", udpDefPrefs.serialLANPort);
         settings->setValue("ServerAudioPort", udpDefPrefs.audioLANPort);

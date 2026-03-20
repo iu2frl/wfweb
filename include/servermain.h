@@ -48,7 +48,7 @@ class servermain : public QObject
     Q_OBJECT
 
 public:
-    servermain(const QString logFile, quint16 cmdLineWebPort = 0);
+    servermain(const QString logFile, quint16 cmdLineWebPort = 0, bool noServer = false);
     ~servermain();
 
 signals:
@@ -189,6 +189,7 @@ private:
     QSettings *settings=Q_NULLPTR;
     void loadSettings();
     quint16 cmdLineWebPort = 0;
+    bool noServer = false;
 
     void openRig();
     void powerRigOff();

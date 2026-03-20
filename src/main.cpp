@@ -138,9 +138,10 @@ int main(int argc, char *argv[])
     QString settingsFile = NULL;
     QString currentArg;
     quint16 webPort = 0;  // 0 means use settings file value
+    bool noServer = false;
 
 
-    const QString helpText = QString("\nUsage: -l --logfile filename.log, -s --settings filename.ini, -c --clearconfig CONFIRM, -b --background (not Windows), -d --debug, -p --port <port>, -v --version\n"); // TODO...
+    const QString helpText = QString("\nUsage: -l --logfile filename.log, -s --settings filename.ini, -c --clearconfig CONFIRM, -b --background (not Windows), -d --debug, -p --port <port>, -S --no-server, -v --version\n"); // TODO...
 #ifdef BUILD_WFSERVER
     const QString version = QString("wfweb version: %1 (Git:%2 on %3 at %4 by %5@%6)\nOperating System: %7 (%8)\nBuild Qt Version %9. Current Qt Version: %10\n")
         .arg(QString(WFVIEW_VERSION))
@@ -264,6 +265,10 @@ int main(int argc, char *argv[])
                 return -1;
             }
         }
+        else if ((currentArg == "-S") || (currentArg == "--no-server"))
+        {
+            noServer = true;
+        }
         else if ((currentArg == "-?") || (currentArg == "--help"))
         {
             std::cout << helpText.toStdString();
@@ -303,7 +308,7 @@ int main(int argc, char *argv[])
     signal(SIGTERM, cleanup);
     signal(SIGKILL, cleanup);
  #endif
-    w = new servermain(settingsFile, webPort);
+    w = new servermain(settingsFile, webPort, noServer);
 #else
     a.setWheelScrollLines(1); // one line per wheel click
     wfmain w(settingsFile, logFilename, debugMode, webPort);
