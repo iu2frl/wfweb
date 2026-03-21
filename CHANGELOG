@@ -6,6 +6,35 @@ a built-in web interface. See https://gitlab.com/eliggett/wfview for the
 upstream wfview history.
 
 
+v0.3.2 (2026-03-20)
+--------------------
+
+LAN/UDP support:
+- LAN/UDP connection support in headless mode (servermain): connect to a
+  remote rig over the network without the GUI
+- CLI overrides for full LAN configuration without a .ini file: --lan,
+  --lan-control, --lan-serial, --lan-audio, --lan-user, --lan-pass,
+  --civ, --manufacturer
+- --no-server / -S flag to disable the built-in rig server when
+  connecting to a remote rig that already runs one
+- Audio streaming works over LAN with proper codec/sample rate config
+  and 150ms latency defaults for remote buffering
+
+CLI:
+- --port / -p flag to override the web server port from the command line
+- Fix --help and --version hanging (defer keyboard thread start)
+
+
+v0.3.1 (2026-03-19)
+--------------------
+
+DIGI panel:
+- Smooth ALC control to eliminate TX power fluctuations during FT8/FT4
+
+Infrastructure:
+- Include Windows build in release pipeline
+
+
 v0.3.0 (2026-03-16)
 --------------------
 
