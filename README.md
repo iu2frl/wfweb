@@ -309,6 +309,36 @@ docker run --rm -it \
   k1fm/wfweb:latest --civ 130
 ```
 
+If your radio is on a different serial port, use `--serial-port` or Docker device remapping:
+
+```bash
+# Explicit serial port
+docker run --rm -it \
+  --device /dev/ttyUSB1 \
+  -p 8080:8080 -p 8081:8081 \
+  k1fm/wfweb:latest --serial-port /dev/ttyUSB1
+
+# Remap host device to container path
+docker run --rm -it \
+  --device=/dev/ttyUSB1:/dev/ttyUSB0 \
+  --group-add $(stat -c %g /dev/ttyUSB1) \
+  -p 8080:8080 -p 8081:8081 \
+  k1fm/wfweb:latest
+```
+
+For USB audio (TX/RX audio through the radio's USB audio codec), pass
+`--device /dev/snd` and `--group-add audio`. The container automatically
+uses ALSA for direct hardware access:
+
+```bash
+docker run --rm -it \
+  --device /dev/ttyUSB0 \
+  --device /dev/snd \
+  --group-add audio \
+  -p 8080:8080 -p 8081:8081 \
+  k1fm/wfweb:latest --serial-port /dev/ttyUSB0
+```
+
 For LAN-connected radios (no USB device needed):
 
 ```bash

@@ -2197,13 +2197,11 @@ void webServer::setupUsbAudio(quint32 sampleRate)
 
     connect(usbAudioDevice, &QIODevice::readyRead, this, &webServer::readUsbAudio);
 
-#ifdef Q_OS_WIN
-    // On Windows, readyRead is not reliably emitted for QAudioInput in pull mode.
-    // Use a poll timer as a fallback to ensure we read audio data regularly.
+    // readyRead is not reliably emitted for QAudioInput in pull mode on
+    // Windows and ALSA backends.  Use a poll timer as a fallback.
     usbAudioPollTimer = new QTimer(this);
     connect(usbAudioPollTimer, &QTimer::timeout, this, &webServer::readUsbAudio);
     usbAudioPollTimer->start(20);  // 20ms = 960 samples at 48kHz
-#endif
 
     audioConfigured = true;
     qInfo() << "Web: USB audio capture configured, sampleRate=" << rigSampleRate

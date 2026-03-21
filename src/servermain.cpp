@@ -560,7 +560,12 @@ void servermain::setDefPrefs()
     defPrefs.serialPortBaud = 115200;
     defPrefs.localAFgain = 255;
     defPrefs.tcpPort = 0;
-    defPrefs.audioSystem = qtAudio;
+    // Default to rtAudio when running headless (offscreen) since Qt audio
+    // backend cannot enumerate devices without a display platform plugin.
+    if (qEnvironmentVariable("QT_QPA_PLATFORM") == "offscreen")
+        defPrefs.audioSystem = rtAudio;
+    else
+        defPrefs.audioSystem = qtAudio;
     defPrefs.webPort = 8080;
     defPrefs.rxAudio.name = QString("default");
     defPrefs.txAudio.name = QString("default");
@@ -739,7 +744,7 @@ void servermain::loadSettings()
                 }
                 else {
                     //fall back:
-                    qInfo(logSystem()) << "Could not find an Icom serial port. Falling back to OS default. Use --port to specify, or modify preferences.";
+                    qInfo(logSystem()) << "Could not find an Icom serial port. Falling back to OS default. Use --serial-port to specify, or modify preferences.";
                     qInfo(logSystem()) << "Found serial ports:";
                     for(const QSerialPortInfo & serialPortInfo: QSerialPortInfo::availablePorts())
                     {
@@ -882,6 +887,21 @@ void servermain::applyCLIOverrides()
     }
     if (cliOverrides.manufacturer >= 0) {
         prefs.manufacturer = static_cast<manufacturersType_t>(cliOverrides.manufacturer);
+    }
+    if (cliOverrides.audioSystem >= 0) {
+        prefs.audioSystem = static_cast<audioType>(cliOverrides.audioSystem);
+        for (RIGCONFIG* radio : serverConfig.rigs) {
+            radio->rxAudioSetup.type = prefs.audioSystem;
+            radio->txAudioSetup.type = prefs.audioSystem;
+        }
+    }
+
+    // Serial port override
+    if (!cliOverrides.usbPort.isEmpty()) {
+        for (RIGCONFIG* radio : serverConfig.rigs) {
+            radio->serialPort = cliOverrides.usbPort;
+        }
+        qInfo(logSystem()) << "Serial port overridden via CLI:" << cliOverrides.usbPort;
     }
 
     // Log if LAN mode was enabled via CLI

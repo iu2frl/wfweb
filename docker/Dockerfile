@@ -33,8 +33,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libqt5core5t64 libqt5gui5t64 libqt5widgets5t64 \
     libqt5network5t64 libqt5serialport5 libqt5multimedia5 \
     libqt5websockets5 libqt5gamepad5 libqt5printsupport5t64 \
+    libqt5multimedia5-plugins libasound2-data \
     libopus0 libportaudio2 libpulse0 libhidapi-libusb0 \
-    libudev1 libqcustomplot2.1 \
+    libudev1 udev libqcustomplot2.1 \
     && rm -rf /var/lib/apt/lists/*
 
 # The binary links against librtaudio v6 (24.04) but 25.04 ships v7 with an
@@ -44,6 +45,11 @@ RUN ldconfig
 COPY --from=builder /install/usr/local /usr/local
 
 ENV QT_QPA_PLATFORM=offscreen
+
+# Remove the PulseAudio Qt plugin so Qt Multimedia uses ALSA directly.
+# No PulseAudio daemon runs inside the container; leaving the plugin causes
+# noisy "Connection refused" warnings on every audio enumeration.
+RUN rm -f /usr/lib/*/qt5/plugins/audio/libqtmedia_pulse.so
 
 EXPOSE 8080 8081
 
