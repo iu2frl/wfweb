@@ -43,12 +43,27 @@ namespace Ui {
 class wfmain;
 }
 
+struct cmdLineOverrides {
+    quint16 webPort = 0;
+    bool noServer = false;
+    // [LAN] overrides — setting lanIP enables LAN mode
+    QString lanIP;
+    int controlPort = 0;
+    int serialPort = 0;
+    int audioPort = 0;
+    QString lanUser;
+    QString lanPass;
+    // [Radio] overrides
+    int civAddr = -1;
+    int manufacturer = -1;
+};
+
 class servermain : public QObject
 {
     Q_OBJECT
 
 public:
-    servermain(const QString logFile, quint16 cmdLineWebPort = 0, bool noServer = false);
+    servermain(const QString settingsFile, const cmdLineOverrides& overrides = cmdLineOverrides());
     ~servermain();
 
 signals:
@@ -188,8 +203,8 @@ private slots:
 private:
     QSettings *settings=Q_NULLPTR;
     void loadSettings();
-    quint16 cmdLineWebPort = 0;
-    bool noServer = false;
+    void applyCLIOverrides();
+    cmdLineOverrides cliOverrides;
 
     void openRig();
     void powerRigOff();

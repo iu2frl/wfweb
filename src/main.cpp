@@ -116,7 +116,6 @@ int main(int argc, char *argv[])
     a.setOrganizationDomain("wfview.org");
     a.setApplicationName("wfweb");
     kb = new keyboard();
-    kb->start();
 #else
 #if (QT_VERSION < QT_VERSION_CHECK(6,0,0))
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
@@ -137,11 +136,28 @@ int main(int argc, char *argv[])
 
     QString settingsFile = NULL;
     QString currentArg;
-    quint16 webPort = 0;  // 0 means use settings file value
-    bool noServer = false;
+    cmdLineOverrides overrides;
 
 
-    const QString helpText = QString("\nUsage: -l --logfile filename.log, -s --settings filename.ini, -c --clearconfig CONFIRM, -b --background (not Windows), -d --debug, -p --port <port>, -S --no-server, -v --version\n"); // TODO...
+    const QString helpText = QString(
+        "\nUsage: wfweb [options]\n"
+        "  -s --settings <file>    Settings .ini file\n"
+        "  -p --port <port>        Web server port\n"
+        "  -S --no-server          Disable rig server\n"
+        "  --lan <ip>              Connect via LAN to IP (enables LAN mode)\n"
+        "  --lan-control <port>    LAN control port (default 50001)\n"
+        "  --lan-serial <port>     LAN serial port (default 50002)\n"
+        "  --lan-audio <port>      LAN audio port (default 50003)\n"
+        "  --lan-user <user>       LAN username\n"
+        "  --lan-pass <pass>       LAN password\n"
+        "  --civ <addr>            CI-V address (decimal, e.g. 148 for IC-7300)\n"
+        "  --manufacturer <id>     Manufacturer ID (0=Icom, 1=Kenwood, 2=Yaesu)\n"
+        "  -l --logfile <file>     Log file\n"
+        "  -b --background         Run as daemon (not Windows)\n"
+        "  -d --debug              Enable debug logging\n"
+        "  -c --clearconfig CONFIRM  Clear all settings\n"
+        "  -v --version            Show version\n"
+        "  -? --help               Show this help\n");
 #ifdef BUILD_WFSERVER
     const QString version = QString("wfweb version: %1 (Git:%2 on %3 at %4 by %5@%6)\nOperating System: %7 (%8)\nBuild Qt Version %9. Current Qt Version: %10\n")
         .arg(QString(WFVIEW_VERSION))
@@ -248,7 +264,7 @@ int main(int argc, char *argv[])
                 int port = QString(argv[c + 1]).toInt(&ok);
                 if (ok && port > 0 && port <= 65535)
                 {
-                    webPort = static_cast<quint16>(port);
+                    overrides.webPort = static_cast<quint16>(port);
                     c += 1;
                 }
                 else
@@ -267,7 +283,47 @@ int main(int argc, char *argv[])
         }
         else if ((currentArg == "-S") || (currentArg == "--no-server"))
         {
-            noServer = true;
+            overrides.noServer = true;
+        }
+        else if (currentArg == "--lan")
+        {
+            if (argc > c + 1) { overrides.lanIP = argv[++c]; }
+            else { std::cout << "Error: --lan requires IP address\n"; return -1; }
+        }
+        else if (currentArg == "--lan-control")
+        {
+            if (argc > c + 1) { overrides.controlPort = QString(argv[++c]).toInt(); }
+            else { std::cout << "Error: --lan-control requires port\n"; return -1; }
+        }
+        else if (currentArg == "--lan-serial")
+        {
+            if (argc > c + 1) { overrides.serialPort = QString(argv[++c]).toInt(); }
+            else { std::cout << "Error: --lan-serial requires port\n"; return -1; }
+        }
+        else if (currentArg == "--lan-audio")
+        {
+            if (argc > c + 1) { overrides.audioPort = QString(argv[++c]).toInt(); }
+            else { std::cout << "Error: --lan-audio requires port\n"; return -1; }
+        }
+        else if (currentArg == "--lan-user")
+        {
+            if (argc > c + 1) { overrides.lanUser = argv[++c]; }
+            else { std::cout << "Error: --lan-user requires username\n"; return -1; }
+        }
+        else if (currentArg == "--lan-pass")
+        {
+            if (argc > c + 1) { overrides.lanPass = argv[++c]; }
+            else { std::cout << "Error: --lan-pass requires password\n"; return -1; }
+        }
+        else if (currentArg == "--civ")
+        {
+            if (argc > c + 1) { overrides.civAddr = QString(argv[++c]).toInt(); }
+            else { std::cout << "Error: --civ requires address\n"; return -1; }
+        }
+        else if (currentArg == "--manufacturer")
+        {
+            if (argc > c + 1) { overrides.manufacturer = QString(argv[++c]).toInt(); }
+            else { std::cout << "Error: --manufacturer requires ID\n"; return -1; }
         }
         else if ((currentArg == "-?") || (currentArg == "--help"))
         {
@@ -308,7 +364,8 @@ int main(int argc, char *argv[])
     signal(SIGTERM, cleanup);
     signal(SIGKILL, cleanup);
  #endif
-    w = new servermain(settingsFile, webPort, noServer);
+    kb->start();
+    w = new servermain(settingsFile, overrides);
 #else
     a.setWheelScrollLines(1); // one line per wheel click
     wfmain w(settingsFile, logFilename, debugMode, webPort);

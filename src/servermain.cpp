@@ -8,8 +8,8 @@
 // This code is copyright 2017-2020 Elliott H. Liggett
 // All rights reserved
 
-servermain::servermain(const QString settingsFile, quint16 cmdLineWebPort, bool noServer)
-    : cmdLineWebPort(cmdLineWebPort), noServer(noServer)
+servermain::servermain(const QString settingsFile, const cmdLineOverrides& overrides)
+    : cliOverrides(overrides)
 {
 
     qRegisterMetaType <udpPreferences>(); // Needs to be registered early.
@@ -50,6 +50,7 @@ servermain::servermain(const QString settingsFile, quint16 cmdLineWebPort, bool 
     getSettingsFilePath(settingsFile);
 
     loadSettings(); // Look for saved preferences
+    applyCLIOverrides();
 
     setManufacturer(prefs.manufacturer);
 
@@ -61,7 +62,7 @@ servermain::servermain(const QString settingsFile, quint16 cmdLineWebPort, bool 
 
     // Initialize web server before openRig so audio connections can be made
     // Command-line port overrides settings file
-    quint16 effectiveWebPort = (cmdLineWebPort > 0) ? cmdLineWebPort : prefs.webPort;
+    quint16 effectiveWebPort = (cliOverrides.webPort > 0) ? cliOverrides.webPort : prefs.webPort;
     if (effectiveWebPort > 0) {
         web = new webServer();
         webThread = new QThread(this);
@@ -490,7 +491,7 @@ void servermain::setServerToPrefs()
         server = Q_NULLPTR;
     }
 
-    if (noServer) {
+    if (cliOverrides.noServer) {
         qInfo(logSystem()) << "Rig server disabled (--no-server)";
         return;
     }
@@ -838,6 +839,57 @@ void servermain::loadSettings()
     delete audio;
 #endif
 
+}
+
+void servermain::applyCLIOverrides()
+{
+    // --lan <ip> enables LAN mode and sets IP
+    if (!cliOverrides.lanIP.isEmpty()) {
+        // If LAN wasn't already enabled via settings file, seed from defaults
+        if (!prefs.enableLAN) {
+            prefs.enableLAN = true;
+            udpPrefs.controlLANPort = udpDefPrefs.controlLANPort;
+            udpPrefs.serialLANPort = udpDefPrefs.serialLANPort;
+            udpPrefs.audioLANPort = udpDefPrefs.audioLANPort;
+            udpPrefs.username = udpDefPrefs.username;
+            udpPrefs.password = udpDefPrefs.password;
+            udpPrefs.clientName = udpDefPrefs.clientName;
+        }
+        udpPrefs.ipAddress = cliOverrides.lanIP;
+    }
+
+    // LAN port overrides
+    if (cliOverrides.controlPort > 0)
+        udpPrefs.controlLANPort = cliOverrides.controlPort;
+    if (cliOverrides.serialPort > 0)
+        udpPrefs.serialLANPort = cliOverrides.serialPort;
+    if (cliOverrides.audioPort > 0)
+        udpPrefs.audioLANPort = cliOverrides.audioPort;
+
+    // LAN credentials
+    if (!cliOverrides.lanUser.isEmpty())
+        udpPrefs.username = cliOverrides.lanUser;
+    if (!cliOverrides.lanPass.isEmpty())
+        udpPrefs.password = cliOverrides.lanPass;
+
+    // Radio overrides
+    if (cliOverrides.civAddr >= 0) {
+        prefs.radioCIVAddr = (unsigned char)cliOverrides.civAddr;
+        for (RIGCONFIG* radio : serverConfig.rigs) {
+            radio->civAddr = prefs.radioCIVAddr;
+        }
+    }
+    if (cliOverrides.manufacturer >= 0) {
+        prefs.manufacturer = static_cast<manufacturersType_t>(cliOverrides.manufacturer);
+    }
+
+    // Log if LAN mode was enabled via CLI
+    if (prefs.enableLAN && !cliOverrides.lanIP.isEmpty()) {
+        qInfo(logSystem()) << "LAN mode enabled via CLI, connecting to" << udpPrefs.ipAddress
+                           << "control:" << udpPrefs.controlLANPort
+                           << "serial:" << udpPrefs.serialLANPort
+                           << "audio:" << udpPrefs.audioLANPort;
+    }
 }
 
 void servermain::updateAudioDevices()

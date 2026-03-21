@@ -56,9 +56,29 @@ Open your browser at `https://<host>:8080`. On first visit, accept the browser's
 
 wfweb will detect the IC-7300 automatically (CI-V address 0x94, baud 115200, port auto-detected).
 
+### LAN connection (no config file needed)
+
+If your radio (or a wfview server) is reachable over the network, you can connect entirely from the command line:
+
+```bash
+wfweb --lan 192.168.1.100 --lan-user admin --lan-pass secret -S
+```
+
+This enables LAN/UDP mode, connects to the given IP with default Icom ports (50001–50003), and disables the built-in rig server (`-S`) to avoid port conflicts. All parameters have sensible defaults — only `--lan` is required to enable LAN mode.
+
 ### Other radios
 
-For radios other than the IC-7300, create a configuration file at `~/.config/wfview/wfview.conf`. The `[Program]` section tells wfweb to skip the first-time setup dialog; the `[Radio]` section identifies the rig.
+For radios other than the IC-7300, you can either pass CLI flags or create a configuration file.
+
+#### CLI example (IC-705 via LAN)
+
+```bash
+wfweb --lan 192.168.1.100 --civ 164 --lan-user admin -S
+```
+
+#### Config file
+
+Create a `.ini` file and pass it with `-s`. The `[Program]` section tells wfweb to skip the first-time setup dialog; the `[Radio]` section identifies the rig.
 
 > **Note:** Only the IC-7300 via USB has been tested. The settings below are derived from CI-V documentation and are provided as a starting point — use at your own risk and please report results.
 
@@ -75,7 +95,7 @@ SerialPortRadio=auto
 SerialPortBaud=115200
 ```
 
-#### IC-7300 Mk2 (Ethernet)
+#### IC-7300 Mk2 (Ethernet / LAN)
 
 ```ini
 [Program]
@@ -91,12 +111,17 @@ IPAddress=192.168.1.100
 ControlLANPort=50001
 SerialLANPort=50002
 AudioLANPort=50003
-ScopeLANPort=50004
 Username=admin
 Password=
 ```
 
-Replace `192.168.1.100` with your radio's IP address. `Username` and `Password` match the network settings configured in the radio's menu. Ports 50001–50004 are Icom's defaults and normally do not need to be changed.
+Replace `192.168.1.100` with your radio's (or wfview server's) IP address. `Username` and `Password` match the credentials configured on the remote end. Ports 50001–50003 are the defaults and normally do not need to be changed.
+
+Or equivalently, without a config file:
+
+```bash
+wfweb --lan 192.168.1.100 --civ 130 --lan-user admin -S
+```
 
 #### IC-705 (USB)
 
@@ -188,6 +213,29 @@ CI-V addresses are listed in decimal (`RigCIVuInt`). If your radio has been conf
 | `AudioInput` | `[LAN]` | **Optional.** Local server audio input device. Omit for browser-only use. | `hw:CARD=CODEC,DEV=0` |
 
 > Audio streams directly between the radio and the browser — no server-side audio configuration is needed for web operation. `AudioOutput`/`AudioInput` only affect playback and capture on the server machine itself. Use `aplay -l` / `arecord -l` to list ALSA devices if needed.
+
+### Command-line options
+
+All settings-file parameters can be overridden from the command line. Run `wfweb --help` for the full list:
+
+| Flag | Description | Default |
+|---|---|---|
+| `-s --settings <file>` | Settings .ini file | `~/.config/wfview/wfweb.conf` |
+| `-p --port <port>` | Web server HTTPS port | `8080` |
+| `-S --no-server` | Disable built-in rig server | server enabled |
+| `--lan <ip>` | Connect via LAN/UDP to IP (enables LAN mode) | USB serial |
+| `--lan-control <port>` | LAN control port | `50001` |
+| `--lan-serial <port>` | LAN serial/CI-V port | `50002` |
+| `--lan-audio <port>` | LAN audio port | `50003` |
+| `--lan-user <user>` | LAN username | (empty) |
+| `--lan-pass <pass>` | LAN password | (empty) |
+| `--civ <addr>` | CI-V address (decimal) | auto-detect |
+| `--manufacturer <id>` | 0=Icom, 1=Kenwood, 2=Yaesu | `0` (Icom) |
+| `-l --logfile <file>` | Log to file | `/tmp/wfweb-*.log` |
+| `-b --background` | Run as daemon (Linux/macOS) | foreground |
+| `-d --debug` | Enable debug logging | off |
+
+CLI flags override values from the settings file. Passing `--lan` is sufficient to enable LAN mode with default ports; all other LAN flags are optional.
 
 ---
 
