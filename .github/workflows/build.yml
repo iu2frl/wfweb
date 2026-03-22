@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: true
 
@@ -108,14 +108,14 @@ jobs:
           mv deb-build/wfweb_${VERSION}_${{ matrix.deb_arch }}.deb wfweb_${VERSION}_${{ matrix.deb_arch }}.deb
 
       - name: Upload tarball artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wfweb-${{ matrix.arch }}-tar
           path: wfweb-${{ matrix.arch }}.tar.gz
           retention-days: 30
 
       - name: Upload deb artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wfweb-${{ matrix.arch }}-deb
           path: wfweb_*_${{ matrix.deb_arch }}.deb
@@ -127,7 +127,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: true
 
@@ -154,7 +154,7 @@ jobs:
           tar czf wfweb-macos-arm64.tar.gz -C dist .
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wfweb-macos-arm64
           path: wfweb-macos-arm64.tar.gz
@@ -167,7 +167,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: true
 
@@ -230,7 +230,7 @@ jobs:
         run: Compress-Archive -Path wfweb-release -DestinationPath wfweb-windows-x86_64.zip
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wfweb-windows-x86_64
           path: wfweb-windows-x86_64.zip
@@ -246,7 +246,7 @@ jobs:
 
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
