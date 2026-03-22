@@ -16,7 +16,7 @@ macx:CONFIG -= app_bundle
 macx:CONFIG += c++17
 win32:CONFIG += c++17
 
-DEFINES += WFVIEW_VERSION=\\\"0.3.4\\\"
+DEFINES += WFVIEW_VERSION=\\\"0.3.5\\\"
 
 DEFINES += BUILD_WFSERVER
 

@@ -6,6 +6,25 @@ a built-in web interface. See https://gitlab.com/eliggett/wfview for the
 upstream wfview history.
 
 
+v0.3.5 (2026-03-22)
+--------------------
+
+Build:
+- Add macOS (Apple Silicon) build to CI and release pipeline
+- Add macOS build instructions to BUILDING.md
+- Enable C++17 for Eigen compatibility on macOS
+- Bump GitHub Actions to Node.js 24 compatible versions
+
+Fixes:
+- Fix macOS TLS proxy truncating large responses and blocking WebSocket
+
+Docs:
+- Reorganize README: lead with screenshots and quick-start paths, highlight
+  Docker for IC-7300 Mk2 Ethernet users, link to BUILDING.md for build
+  instructions
+- Update screenshots
+
+
 v0.3.4 (2026-03-21)
 --------------------
 
