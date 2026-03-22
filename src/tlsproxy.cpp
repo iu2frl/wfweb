@@ -192,20 +192,29 @@ void TlsProxyWorker::proxyConnection(int clientFd, SSL_CTX *ctx, quint16 backend
                 sent += w;
             }
         }
-        if (fds[0].revents & (POLLHUP | POLLERR)) { running = false; break; }
+        if (fds[0].revents & POLLERR) { running = false; break; }
+        if (fds[0].revents & POLLHUP) { running = false; break; }
 
-        // Backend -> TLS client
-        if (fds[1].revents & POLLIN) {
-            int n = recv(backendFd, buf, sizeof(buf), 0);
-            if (n <= 0) { running = false; break; }
-            int sent = 0;
-            while (sent < n) {
-                int w = SSL_write(ssl, buf + sent, n - sent);
-                if (w <= 0) { running = false; break; }
-                sent += w;
+        // Backend -> TLS client: drain all available data.
+        // poll() can set POLLIN|POLLHUP together when the peer closes
+        // after writing, so we must drain buffered data before exiting.
+        // Use MSG_DONTWAIT to avoid blocking (which would stall the
+        // bidirectional forwarding needed for WebSocket).
+        if (fds[1].revents & (POLLIN | POLLHUP)) {
+            for (;;) {
+                int n = recv(backendFd, buf, sizeof(buf), MSG_DONTWAIT);
+                if (n == 0) { running = false; break; }    // peer closed
+                if (n < 0) break;                           // EAGAIN: no more data right now
+                int sent = 0;
+                while (sent < n) {
+                    int w = SSL_write(ssl, buf + sent, n - sent);
+                    if (w <= 0) { running = false; break; }
+                    sent += w;
+                }
+                if (sent < n) { running = false; break; }
             }
         }
-        if (fds[1].revents & (POLLHUP | POLLERR)) { running = false; break; }
+        if (fds[1].revents & POLLERR) { running = false; break; }
     }
 
     // Cleanup
