@@ -87,6 +87,45 @@ The self-contained deployment directory is `wfweb-release\`, containing:
 - `release/`, `debug/` (intermediate object files)
 - `wfweb-release/`, `wfweb-debug/` (output directories)
 
+## macOS
+
+### Prerequisites
+
+Install Qt 5 and the required libraries via Homebrew:
+
+```bash
+brew install qt@5 portaudio opus openssl@3
+```
+
+The build also requires these source trees cloned as sibling directories next to `wfweb/`:
+
+| Directory | Repository / Source |
+|---|---|
+| `../rtaudio` | https://github.com/thestk/rtaudio |
+| `../eigen` | https://gitlab.com/libeigen/eigen |
+| `../opus` | https://github.com/xiph/opus (needs `include/` headers) |
+
+(`../r8brain-free-src` is referenced as an include path but no sources are compiled from it — an empty directory is sufficient.)
+
+### Build
+
+Homebrew's Qt 5 is keg-only, so use its full path for `qmake`:
+
+```bash
+/opt/homebrew/opt/qt@5/bin/qmake wfweb.pro
+make -j$(sysctl -n hw.ncpu)
+```
+
+This produces the `wfweb` binary in the project root.
+
+### Run
+
+```bash
+./wfweb
+```
+
+The web interface is served on `https://localhost:8080` (self-signed certificate).
+
 ## Notes
 
 - The project file is `wfweb.pro`.
