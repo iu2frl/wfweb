@@ -2210,6 +2210,8 @@ var hasSpectrum = false;
 var spectAmpMax = 160;
 var spectStartFreq = 0;
 var spectEndFreq = 0;
+var prevSpectStartFreq = 0;
+var prevSpectEndFreq = 0;
 var spectData = null;
 var spectDataLen = 0;
 var wfImageData = null;
@@ -3930,6 +3932,8 @@ function handleBinaryMessage(buffer) {
     if (msgType === 0x02) { handleAudioData(buffer); return; }
     if (msgType !== 0x01 || buffer.byteLength < 13) return;
 
+    prevSpectStartFreq = spectStartFreq;
+    prevSpectEndFreq = spectEndFreq;
     spectStartFreq = view.getFloat32(4, true);
     spectEndFreq = view.getFloat32(8, true);
     spectData = new Uint8Array(buffer, 12);
@@ -3942,8 +3946,37 @@ function handleBinaryMessage(buffer) {
         document.getElementById('spanEdgeRight').textContent = '+' + (halfSpan * 1000).toFixed(0);
     }
 
+    shiftWaterfallForFreqChange();
     updateWaterfallRow();
     if (!spectRenderPending) { spectRenderPending = true; requestAnimationFrame(renderScope); }
+}
+
+function shiftWaterfallForFreqChange() {
+    if (!wfImageData || prevSpectStartFreq === 0 || prevSpectEndFreq === 0) return;
+    var curSpan = spectEndFreq - spectStartFreq;
+    if (curSpan <= 0) return;
+    var shiftPixels = Math.round((prevSpectStartFreq - spectStartFreq) / curSpan * wfImageData.width);
+    if (shiftPixels === 0) return;
+    var w = wfImageData.width, d = wfImageData.data, rowBytes = w * 4;
+    var absShift = Math.min(Math.abs(shiftPixels), w);
+    if (absShift >= w) {
+        // Frequency jumped too far — clear entire waterfall
+        for (var i = 0; i < d.length; i += 4) { d[i] = 0; d[i+1] = 0; d[i+2] = 0; d[i+3] = 255; }
+        return;
+    }
+    var h = wfImageData.height;
+    for (var row = 0; row < h; row++) {
+        var rs = row * rowBytes;
+        if (shiftPixels < 0) {
+            // Tuned up: old data shifts left, blank on right
+            d.copyWithin(rs, rs + absShift * 4, rs + rowBytes);
+            for (var i = rs + (w - absShift) * 4; i < rs + rowBytes; i += 4) { d[i] = 0; d[i+1] = 0; d[i+2] = 0; d[i+3] = 255; }
+        } else {
+            // Tuned down: old data shifts right, blank on left
+            d.copyWithin(rs + absShift * 4, rs, rs + (w - absShift) * 4);
+            for (var i = rs; i < rs + absShift * 4; i += 4) { d[i] = 0; d[i+1] = 0; d[i+2] = 0; d[i+3] = 255; }
+        }
+    }
 }
 
 function updateWaterfallRow() {
