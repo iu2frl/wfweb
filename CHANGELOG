@@ -6,6 +6,19 @@ a built-in web interface. See https://gitlab.com/eliggett/wfview for the
 upstream wfview history.
 
 
+v0.3.6 (2026-03-24)
+--------------------
+
+Fixes:
+- Fix radio menus closing by using .rig file periodic commands instead of
+  hardcoded aggressive CI-V polling that saturated the bus
+- Keep Power/SWR/ALC meter polling at priorityHighest for responsive meters
+
+Enhancements:
+- Shift waterfall history on frequency change to maintain signal alignment;
+  band jumps clear the waterfall
+
+
 v0.3.5 (2026-03-22)
 --------------------
 
