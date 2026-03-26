@@ -625,10 +625,14 @@ void icomCommander::parseData(QByteArray dataInput)
                     break;
                 }
                 parseCommand();
-                // We can use this to indicate power status I think
-                if (!rigPoweredOn) {
+                // Require several consecutive valid (non-FA) responses
+                // before declaring the radio back on.  A single stray
+                // valid response during shutdown must not flip state.
+                if (!rigPoweredOn && validResponseCount >= 3) {
+                    qInfo(logRig()) << "Sustained valid responses — radio powered on";
                     queue->receiveValue(funcPowerControl,QVariant::fromValue<bool>(true),0);
                     rigPoweredOn = true;
+                    validResponseCount = 0;
                 }
 
                 break;
@@ -1429,12 +1433,25 @@ void icomCommander::parseCommand()
             qWarning(logRig()) << "Rig (FA) error, last command sent:" << funcString[lastCommand.func] << "(min:" << lastCommand.minValue << "max:" <<
                 lastCommand.maxValue << "bytes:" << lastCommand.bytes <<  ") data:" << lastCommand.data.toHex(' ');
         }
+        consecutiveFAErrors++;
+        validResponseCount = 0;
+        if (consecutiveFAErrors >= 5 && rigPoweredOn) {
+            qInfo(logRig()) << "Multiple consecutive FA errors — radio likely powered off";
+            queue->receiveValue(funcPowerControl, QVariant::fromValue<bool>(false), 0);
+            rigPoweredOn = false;
+        }
         break;
     }
     default:
         qWarning(logRig()).noquote() << "Unhandled command received from rig:" << funcString[func] << "value:" << payloadIn.toHex().mid(0,10);
         break;
     }
+    // Track consecutive valid vs FA responses for power state detection
+    if (func != funcFA && func != funcFB && func != funcNone) {
+        consecutiveFAErrors = 0;
+        validResponseCount++;
+    }
+
     if(func != funcScopeWaveData
         && func != funcSMeter
         && func != funcAbsoluteMeter

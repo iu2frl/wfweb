@@ -131,6 +131,8 @@ private:
     bool foundRig;
 
     bool warnedAboutFA=false;
+    int consecutiveFAErrors=0;
+    int validResponseCount=0;
     double frequencyMhz;
     quint16 civAddr;
     quint16 incomingCIVAddr; // place to store the incoming CIV.
