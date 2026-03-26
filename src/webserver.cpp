@@ -1468,6 +1468,14 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
         queue->add(priorityImmediate, queueItem(funcSendCW, QVariant::fromValue<QString>(QString())));
         qCDebug(logWebServer) << "stopCW";
     }
+    else if (type == "setPower") {
+        bool on = cmd["value"].toBool();
+        if (on) {
+            emit requestPowerOn();
+        } else {
+            emit requestPowerOff();
+        }
+    }
     else {
         qWarning() << "Web: Unknown command:" << type;
         QJsonObject err;
@@ -1501,6 +1509,7 @@ QJsonObject webServer::buildInfoJson() const
         }
         info["txAudioAvailable"] = txAudioConfigured;
         info["hasFilterSettings"] = rigCaps->commands.contains(funcPBTInner);
+        info["hasPowerControl"] = rigCaps->commands.contains(funcPowerControl);
         if (!rigCaps->scopeCenterSpans.empty()) {
             QJsonArray spans;
             for (const centerSpanData &s : rigCaps->scopeCenterSpans) {
@@ -1619,6 +1628,13 @@ QJsonObject webServer::buildStatusJson()
     if (txStatus.value.isValid()) {
         status["transmitting"] = txStatus.value.toBool();
     }
+
+    // Power state (on/off)
+    cacheItem powerState = queue->getCache(funcPowerControl, 0);
+    if (powerState.value.isValid()) {
+        rigPoweredOn = powerState.value.toBool();
+    }
+    status["powerState"] = rigPoweredOn;
 
     // AF Gain
     cacheItem afGain = queue->getCache(funcAfGain, 0);
@@ -1839,6 +1855,10 @@ void webServer::receiveCache(cacheItem item)
         }
         break;
     }
+    case funcPowerControl:
+        rigPoweredOn = item.value.toBool();
+        update["powerState"] = rigPoweredOn;
+        break;
     default:
         return; // Don't send updates for unhandled funcs
     }

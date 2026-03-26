@@ -189,6 +189,10 @@ signals:
     void requestRigState();
     void stateUpdated();
 
+public slots:
+    void powerRigOff();
+    void powerRigOn();
+
 private slots:
 
     void receiveCommReady();
@@ -211,8 +215,8 @@ private:
     cmdLineOverrides cliOverrides;
 
     void openRig();
-    void powerRigOff();
-    void powerRigOn();
+    void initPeriodicPolling();
+    void startPowerProbe();
     QStringList portList;
 
     QTimer * delayedCommand;
@@ -317,6 +321,7 @@ private:
 
     QHash<quint16,rigInfo> rigList;
     cachingQueue* queue;
+    bool rigPoweredOn = true;
 };
 
 

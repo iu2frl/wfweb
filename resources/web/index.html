@@ -21,6 +21,7 @@ html, body {
 #radio {
     display: grid;
     grid-template-rows: 34px 80px 20px 1fr 48px;
+    position: relative;
     width: 100%;
     height: var(--viewport-height);
     height: 100dvh; /* Dynamic viewport height for modern browsers */
@@ -120,6 +121,81 @@ html, body {
     background: #600; flex-shrink: 0;
 }
 #connDot.connected { background: #0a0; }
+#powerBtn {
+    width: 22px; height: 22px;
+    border: 2px solid #0a0;
+    border-radius: 50%;
+    background: transparent;
+    color: #0a0;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+    padding: 0;
+    line-height: 1;
+}
+#powerBtn.on { border-color: #0a0; color: #0a0; }
+#powerBtn.off { border-color: #a00; color: #a00; }
+#powerBtn:active { opacity: 0.7; }
+#powerOffOverlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+    z-index: 10000;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #888;
+    font-size: 18px;
+    font-family: system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+#powerOffOverlay.visible { display: flex; }
+#powerConfirm {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7);
+    z-index: 10001;
+    justify-content: center;
+    align-items: center;
+    font-family: system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+#powerConfirm.visible { display: flex; }
+#powerConfirm .dialog {
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 30px 40px;
+    text-align: center;
+    color: #ccc;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+#powerConfirm .dialog-title {
+    font-size: 18px;
+    margin-bottom: 24px;
+}
+#powerConfirm .dialog-btns {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+}
+#powerConfirm .dialog-btns button {
+    padding: 10px 28px;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+#powerConfirm .btn-cancel {
+    background: #333;
+    color: #ccc;
+}
+#powerConfirm .btn-confirm {
+    background: #a00;
+    color: #fff;
+}
 
 /* ============ ROW 2: METER + FREQUENCY ============ */
 #meterFreqRow {
@@ -1777,6 +1853,29 @@ body.digi-open .digi-bar {
     </div>
 </div>
 <div id="audioErrorBanner"><span id="audioErrorText"></span><button onclick="document.getElementById('audioErrorBanner').style.display='none'">&#x2715;</button></div>
+<div id="powerOffOverlay">
+    <div style="text-align: center;">
+        <div style="font-size: 56px; color: #555; margin-bottom: 16px; text-shadow: 0 0 30px rgba(85,85,85,0.3);">&#x23FB;</div>
+        <div style="font-size: 36px; font-weight: bold; color: #0aa; margin-bottom: 6px; text-shadow: 0 0 20px rgba(0,170,170,0.4);">wfweb</div>
+        <div id="powerOffModel" style="font-size: 14px; color: #888; margin-bottom: 24px;"></div>
+        <div id="powerOffMsg" style="font-size: 16px; color: #777; margin-bottom: 28px;">Radio is powered off</div>
+        <div id="powerOffBtns">
+            <button onclick="doPowerOn()" style="padding: 14px 44px; font-size: 18px; font-weight: bold; color: #000; background: linear-gradient(135deg, #0c0 0%, #0a0 100%); border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,170,0,0.4); transition: all 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(0,170,0,0.6)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 15px rgba(0,170,0,0.4)';">Power On</button>
+        </div>
+    </div>
+    <div style="position: absolute; bottom: 20px; left: 20px; font-size: 11px; color: #555;">
+        <span id="powerOffVersion">wfweb</span>
+    </div>
+</div>
+<div id="powerConfirm">
+    <div class="dialog">
+        <div class="dialog-title">Power off the radio?</div>
+        <div class="dialog-btns">
+            <button class="btn-cancel" onclick="cancelPowerOff()">Cancel</button>
+            <button class="btn-confirm" onclick="confirmPowerOff()">Power Off</button>
+        </div>
+    </div>
+</div>
 <div id="radio">
     <!-- Row 1: Top bar -->
     <div id="topBar">
@@ -1789,9 +1888,9 @@ body.digi-open .digi-bar {
         <span class="flex-space"></span>
         <button id="qsoLogBtn" class="qso-log-btn" title="Log QSO">LOG</button>
         <span id="clock">--:--</span>
+        <button id="powerBtn" class="on" title="Power" onclick="togglePower()">&#x23FB;</button>
         <span id="connDot" title="Disconnected"></span>
     </div>
-
     <!-- Row 2: Meter + Frequency -->
     <div id="meterFreqRow">
         <div id="meterSection">
@@ -2138,6 +2237,7 @@ body.digi-open .digi-bar {
 // ============================================================
 var ws = null;
 var serverVersion = '';  // set from rigInfo message
+var rigModelName = '';   // set from rigInfo/rigConnected
 var currentFreq = 0;
 var vfoAFreq = 0;
 var vfoBFreq = 0;
@@ -2145,6 +2245,7 @@ var currentMode = '';
 var tuneStep = 1000;
 var isTransmitting = false;
 var isSplit = false;
+var rigPoweredOn = true;
 var reconnectTimer = null;
 var defaultModes = ['LSB', 'USB', 'AM', 'CW', 'RTTY', 'FM', 'CW-R'];
 
@@ -2171,6 +2272,7 @@ var audioCtx = null;
 var audioWorkletNode = null;
 var audioEnabled = false;
 var audioAvailable = false;
+var audioWasEnabled = false;
 var audioSampleRate = 48000;
 
 var micEnabled = false;
@@ -2384,7 +2486,10 @@ function handleMessage(msg) {
                 serverVersion = msg.version;
                 var el = document.getElementById('splashVersion');
                 if (el) el.textContent = 'wfweb v. ' + msg.version;
+                var pv = document.getElementById('powerOffVersion');
+                if (pv) pv.textContent = 'wfweb v. ' + msg.version;
             }
+            if (msg.model) rigModelName = msg.model;
             if (msg.connected) {
                 if (msg.modes) populateModes(msg.modes);
                 if (msg.hasSpectrum) { hasSpectrum = true; spectAmpMax = msg.spectAmpMax || 160; }
@@ -2395,10 +2500,15 @@ function handleMessage(msg) {
                 if (msg.preamps) populatePreamps(msg.preamps);
                 if (msg.filters) populateFilters(msg.filters);
                 if (msg.hasFilterSettings !== undefined) updateHasFilterSettings(msg.hasFilterSettings);
+
                 updateWarningVisibility();
+            } else {
+                // Radio not detected — likely powered off
+                updatePowerState(false);
             }
             break;
         case 'rigConnected':
+            if (msg.model) rigModelName = msg.model;
             if (msg.modes) populateModes(msg.modes);
             if (msg.hasSpectrum) { hasSpectrum = true; spectAmpMax = msg.spectAmpMax || 160; }
             if (msg.audioAvailable) { audioAvailable = true; audioSampleRate = msg.audioSampleRate || 48000; }
@@ -2408,6 +2518,7 @@ function handleMessage(msg) {
             if (msg.preamps) populatePreamps(msg.preamps);
             if (msg.filters) populateFilters(msg.filters);
             if (msg.hasFilterSettings !== undefined) updateHasFilterSettings(msg.hasFilterSettings);
+            if (msg.hasPowerControl) document.getElementById('powerBtn').style.display = 'flex';
             updateWarningVisibility();
             break;
         case 'audioAvailable':
@@ -2465,6 +2576,7 @@ function handleMessage(msg) {
             if (msg.pbtInner !== undefined) updateSlider('pbtInner', msg.pbtInner);
             if (msg.pbtOuter !== undefined) updateSlider('pbtOuter', msg.pbtOuter);
             if (msg.filterShape !== undefined) updateFilterShapeBtn(msg.filterShape);
+            if (msg.powerState !== undefined) updatePowerState(msg.powerState);
             break;
         case 'update':
             // Handle VFO-specific frequencies if available
@@ -2508,6 +2620,7 @@ function handleMessage(msg) {
             if (msg.pbtInner !== undefined) updateSlider('pbtInner', msg.pbtInner);
             if (msg.pbtOuter !== undefined) updateSlider('pbtOuter', msg.pbtOuter);
             if (msg.filterShape !== undefined) updateFilterShapeBtn(msg.filterShape);
+            if (msg.powerState !== undefined) updatePowerState(msg.powerState);
             break;
         case 'meters':
             if (msg.transmitting !== undefined) updateTxStatus(msg.transmitting);
@@ -3697,6 +3810,59 @@ function swapVFO() {
 }
 function equalizeVFO() { send({ cmd: 'equalizeVFO' }); }
 function toggleSplit() { send({ cmd: 'setSplit', value: !isSplit }); }
+function togglePower() {
+    if (rigPoweredOn) {
+        document.getElementById('powerConfirm').classList.add('visible');
+    } else {
+        doPowerOn();
+    }
+}
+function confirmPowerOff() {
+    document.getElementById('powerConfirm').classList.remove('visible');
+    send({ cmd: 'setPower', value: false });
+}
+function cancelPowerOff() {
+    document.getElementById('powerConfirm').classList.remove('visible');
+}
+function doPowerOn() {
+    send({ cmd: 'setPower', value: true });
+    // Start audio now — this runs in a user-gesture context (button click)
+    // so the browser allows AudioContext creation.  The pipeline will be
+    // ready when the radio boots and audio data starts flowing.
+    if (audioWasEnabled && !audioEnabled) {
+        audioWasEnabled = false;
+        startAudio();
+    }
+    var msg = document.getElementById('powerOffMsg');
+    var btns = document.getElementById('powerOffBtns');
+    if (msg) msg.textContent = 'Powering on, please wait\u2026';
+    if (btns) btns.style.display = 'none';
+}
+function updatePowerState(on) {
+    rigPoweredOn = on;
+    var btn = document.getElementById('powerBtn');
+    var overlay = document.getElementById('powerOffOverlay');
+    var overlayMsg = document.getElementById('powerOffMsg');
+    var overlayBtnContainer = document.getElementById('powerOffBtns');
+    if (on) {
+        btn.className = 'on';
+        btn.title = 'Power Off';
+        overlay.classList.remove('visible');
+    } else {
+        btn.className = 'off';
+        btn.title = 'Power On';
+        if (overlayMsg) overlayMsg.textContent = 'Radio is powered off';
+        if (overlayBtnContainer) overlayBtnContainer.style.display = '';
+        var pm = document.getElementById('powerOffModel');
+        if (pm) pm.textContent = rigModelName || '';
+        overlay.classList.add('visible');
+        // Stop audio cleanly so it can restart on power-on
+        if (audioEnabled) {
+            audioWasEnabled = true;
+            stopAudio();
+        }
+    }
+}
 function tuneUp() {
     if (currentFreq > 0) {
         var newFreq = currentFreq + tuneStep;

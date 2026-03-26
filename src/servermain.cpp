@@ -45,6 +45,23 @@ servermain::servermain(const QString settingsFile, const cmdLineOverrides& overr
     // Make sure we know about any changes to rigCaps
     connect(queue, SIGNAL(rigCapsUpdated(rigCapabilities*)), this, SLOT(receiveRigCaps(rigCapabilities*)));
 
+    // Watch for power state changes from the radio
+    connect(queue, &cachingQueue::cacheUpdated, this, [this](cacheItem item) {
+        if (item.command == funcPowerControl) {
+            bool poweredOn = item.value.toBool();
+            if (poweredOn && !rigPoweredOn) {
+                qInfo(logSystem()) << "Rig powered ON detected, restoring periodic polling";
+                rigPoweredOn = true;
+                initPeriodicPolling();
+            } else if (!poweredOn && rigPoweredOn) {
+                qInfo(logSystem()) << "Rig powered OFF detected, stopping periodic polling";
+                rigPoweredOn = false;
+                queue->clear();
+                startPowerProbe();
+            }
+        }
+    });
+
     setDefPrefs();
 
     getSettingsFilePath(settingsFile);
@@ -70,6 +87,8 @@ servermain::servermain(const QString settingsFile, const cmdLineOverrides& overr
         web->moveToThread(webThread);
         connect(queue, SIGNAL(rigCapsUpdated(rigCapabilities*)), web, SLOT(receiveRigCaps(rigCapabilities*)));
         connect(webThread, SIGNAL(finished()), web, SLOT(deleteLater()));
+        connect(web, &webServer::requestPowerOn, this, &servermain::powerRigOn);
+        connect(web, &webServer::requestPowerOff, this, &servermain::powerRigOff);
         webThread->start();
         QMetaObject::invokeMethod(web, "init", Qt::QueuedConnection,
             Q_ARG(quint16, effectiveWebPort), Q_ARG(quint16, effectiveWebPort + 1));
@@ -217,6 +236,8 @@ void servermain::makeRig()
 
             //Other connections
             connect(this, SIGNAL(setCIVAddr(unsigned char)), radio->rig, SLOT(setCIVAddr(unsigned char)));
+            connect(this, SIGNAL(sendPowerOn()), radio->rig, SLOT(powerOn()));
+            connect(this, SIGNAL(sendPowerOff()), radio->rig, SLOT(powerOff()));
 
             //connect(radio->rig, SIGNAL(havePTTStatus(bool)), this, SLOT(receivePTTstatus(bool)));
             //connect(this, SIGNAL(setPTT(bool)), radio->rig, SLOT(setPTT(bool)));
@@ -361,24 +382,6 @@ void servermain::receiveRigCaps(rigCapabilities* rigCaps)
                 ;
             radio->rigCaps = rigCaps;
 
-            // Calculate queue interval
-            if (usingLAN) {
-                queue->interval(70);
-                qInfo(logSystem()) << "Queue interval set to 70ms (LAN mode)";
-            } else {
-                quint32 baud = prefs.serialPortBaud;
-                if (baud == 0) baud = 9600;
-                unsigned int usPerByte = 9600*1000 / baud;
-                unsigned int msMinTiming = usPerByte * 10 * 2 / 1000;
-                if (msMinTiming < 25) msMinTiming = 25;
-                if (rigCaps->hasFDcomms) {
-                    queue->interval(msMinTiming);
-                } else {
-                    queue->interval(msMinTiming * 4);
-                }
-                qInfo(logSystem()) << "Queue interval set to" << queue->interval() << "ms (baud:" << baud << "hasFDcomms:" << rigCaps->hasFDcomms << ")";
-            }
-
             // Enable CI-V Auto Information so the rig pushes meter/freq/mode
             // updates automatically (same as wfview does in setupInitialValues)
             if (rigCaps->commands.contains(funcAutoInformation)) {
@@ -397,43 +400,8 @@ void servermain::receiveRigCaps(rigCapabilities* rigCaps)
                 qInfo(logSystem()) << "Auto Information enabled for meters";
             }
 
-            // Load periodic poll commands from the .rig file
-            // (matching wfview's initPeriodicCommands approach).
-            // This avoids overly aggressive polling that can saturate
-            // the CI-V bus and close the radio's on-screen menus.
-            QSet<funcs> periodicFuncs;
-            foreach (auto cap, rigCaps->periodic) {
-                if (cap.receiver == char(-1)) {
-                    for (uchar v = 0; v < rigCaps->numReceiver; v++) {
-                        queue->add(queuePriority(cap.prioVal), cap.func, true, v);
-                    }
-                } else {
-                    queue->add(queuePriority(cap.prioVal), cap.func, true, cap.receiver);
-                }
-                periodicFuncs.insert(cap.func);
-            }
-
-            // Add web-specific meter commands if not already in the periodic set.
-            // These are needed for the web meter display but aren't typically
-            // in .rig files (they're TX-only meters added on demand in wfview).
-            // Use priorityHighest for responsive meter updates — these are
-            // read-only GET queries that don't saturate the CI-V bus.
-            if (!periodicFuncs.contains(funcPowerMeter) && rigCaps->commands.contains(funcPowerMeter))
-                queue->addUnique(priorityHighest, queueItem(funcPowerMeter, true, 0));
-            if (!periodicFuncs.contains(funcSWRMeter) && rigCaps->commands.contains(funcSWRMeter))
-                queue->addUnique(priorityHighest, queueItem(funcSWRMeter, true, 0));
-            if (!periodicFuncs.contains(funcALCMeter) && rigCaps->commands.contains(funcALCMeter))
-                queue->addUnique(priorityHighest, queueItem(funcALCMeter, true, 0));
-
-            // Spectrum scope: one-time enable, NOT recurring.
-            // A recurring SET command would send CI-V writes every ~210ms
-            // which interferes with the radio's menu navigation.
-            if (rigCaps->hasSpectrum) {
-                queue->add(priorityImmediate, queueItem(funcScopeOnOff, QVariant::fromValue(quint8(1)), false));
-                queue->add(priorityImmediate, queueItem(funcScopeDataOutput, QVariant::fromValue(quint8(1)), false));
-            }
-
-            qInfo(logSystem()) << "Periodic polling commands loaded from rig file for" << rigCaps->modelName;
+            // Set up queue interval and periodic polling commands
+            initPeriodicPolling();
         }
     }
     return;
@@ -964,11 +932,103 @@ void servermain::receiveBaudRate(quint32 baud)
 void servermain::powerRigOn()
 {
     emit sendPowerOn();
+    // Start heartbeat probe while rig boots; after 5 seconds
+    // force-reinitialize even if echo detection hasn't fired yet.
+    startPowerProbe();
+    QTimer::singleShot(5000, this, [this]() {
+        if (!rigPoweredOn) {
+            rigPoweredOn = true;
+            // Immediately notify frontend that rig is on
+            queue->receiveValue(funcPowerControl, QVariant::fromValue<bool>(true), 0);
+            initPeriodicPolling();
+        }
+    });
 }
 
 void servermain::powerRigOff()
 {
+    rigPoweredOn = false;
+    queue->clear();
+    // Immediately notify frontend that rig is off
+    queue->receiveValue(funcPowerControl, QVariant::fromValue<bool>(false), 0);
     emit sendPowerOff();
+    // Keep a slow heartbeat so we can detect power-on (hardware button)
+    startPowerProbe();
+}
+
+void servermain::initPeriodicPolling()
+{
+    // Restore the normal queue interval
+    for (RIGCONFIG* radio : serverConfig.rigs) {
+        if (radio->rigAvailable && radio->rigCaps != Q_NULLPTR) {
+            rigCapabilities* rigCaps = radio->rigCaps;
+
+            if (usingLAN) {
+                queue->interval(70);
+            } else {
+                quint32 baud = prefs.serialPortBaud;
+                if (baud == 0) baud = 9600;
+                unsigned int usPerByte = 9600 * 1000 / baud;
+                unsigned int msMinTiming = usPerByte * 10 * 2 / 1000;
+                if (msMinTiming < 25) msMinTiming = 25;
+                queue->interval(rigCaps->hasFDcomms ? msMinTiming : msMinTiming * 4);
+            }
+
+            // Re-enable CI-V Auto Information so the rig pushes
+            // meter/freq/mode updates automatically
+            if (rigCaps->commands.contains(funcAutoInformation)) {
+                queue->add(priorityImmediate, queueItem(funcAutoInformation, QVariant::fromValue(uchar(2)), false, 0));
+                if (rigCaps->commands.contains(funcSWRMeter))
+                    queue->add(priorityImmediate, queueItem(funcSWRMeter, QVariant::fromValue(uchar(1)), false, 0));
+                if (rigCaps->commands.contains(funcALCMeter))
+                    queue->add(priorityImmediate, queueItem(funcALCMeter, QVariant::fromValue(uchar(1)), false, 0));
+                if (rigCaps->commands.contains(funcCompMeter))
+                    queue->add(priorityImmediate, queueItem(funcCompMeter, QVariant::fromValue(uchar(1)), false, 0));
+                if (rigCaps->commands.contains(funcIdMeter))
+                    queue->add(priorityImmediate, queueItem(funcIdMeter, QVariant::fromValue(uchar(1)), false, 0));
+                if (rigCaps->commands.contains(funcVdMeter))
+                    queue->add(priorityImmediate, queueItem(funcVdMeter, QVariant::fromValue(uchar(1)), false, 0));
+            }
+
+            // Re-add periodic poll commands
+            QSet<funcs> periodicFuncs;
+            foreach (auto cap, rigCaps->periodic) {
+                if (cap.receiver == char(-1)) {
+                    for (uchar v = 0; v < rigCaps->numReceiver; v++)
+                        queue->add(queuePriority(cap.prioVal), cap.func, true, v);
+                } else {
+                    queue->add(queuePriority(cap.prioVal), cap.func, true, cap.receiver);
+                }
+                periodicFuncs.insert(cap.func);
+            }
+
+            if (!periodicFuncs.contains(funcPowerMeter) && rigCaps->commands.contains(funcPowerMeter))
+                queue->addUnique(priorityHighest, queueItem(funcPowerMeter, true, 0));
+            if (!periodicFuncs.contains(funcSWRMeter) && rigCaps->commands.contains(funcSWRMeter))
+                queue->addUnique(priorityHighest, queueItem(funcSWRMeter, true, 0));
+            if (!periodicFuncs.contains(funcALCMeter) && rigCaps->commands.contains(funcALCMeter))
+                queue->addUnique(priorityHighest, queueItem(funcALCMeter, true, 0));
+
+            if (rigCaps->hasSpectrum) {
+                queue->add(priorityImmediate, queueItem(funcScopeOnOff, QVariant::fromValue(quint8(1)), false));
+                queue->add(priorityImmediate, queueItem(funcScopeDataOutput, QVariant::fromValue(quint8(1)), false));
+            }
+
+            qInfo(logSystem()) << "Periodic polling restored for" << rigCaps->modelName;
+            break; // Only one rig supported currently
+        }
+    }
+}
+
+void servermain::startPowerProbe()
+{
+    // Slow heartbeat: send one recurring probe to detect power state changes.
+    // icomcommander detects power via echo responses on any command;
+    // Yaesu/Kenwood detect via successful/failed responses.
+    // Use priorityHighest so it fires every 2nd tick (every ~4 seconds).
+    queue->clear();
+    queue->interval(2000);
+    queue->add(priorityHighest, funcFreq, true, 0);
 }
 
 void servermain::receiveStateInfo(rigstate* state)

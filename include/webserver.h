@@ -66,6 +66,8 @@ public:
 
 signals:
     void closed();
+    void requestPowerOn();
+    void requestPowerOff();
     void setupConverter(QAudioFormat inFormat, codecType inCodec,
                         QAudioFormat outFormat, codecType outCodec,
                         quint8 opusComplexity, quint8 resampleQuality);
@@ -140,6 +142,7 @@ private:
     rigCapabilities *rigCaps = nullptr;
     QTimer *statusTimer = nullptr;
     QMimeDatabase mimeDb;
+    bool rigPoweredOn = true;
 
     // SSL
     bool sslEnabled = false;
