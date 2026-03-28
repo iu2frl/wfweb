@@ -19,7 +19,7 @@ The IC-7300 Mk2 has a built-in Ethernet port. No USB cable, no drivers, no build
 ```bash
 docker run --rm -it \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest --lan 192.168.1.100 --civ 130 --lan-user admin --lan-pass secret
+  k1fm/wfweb --lan 192.168.1.100 --civ 130 --lan-user admin --lan-pass secret
 ```
 
 Replace the IP, username, and password with your radio's settings. Open `https://<host>:8080` in your browser, accept the self-signed certificate warning, and you're on the air.
@@ -130,7 +130,7 @@ Default CI-V addresses for supported radios (decimal values for `--civ`):
 docker run --rm -it \
   --device /dev/ttyUSB0 \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest
+  k1fm/wfweb
 ```
 
 Pass CLI flags after the image name (e.g. `--civ 130`). For a different serial port:
@@ -139,7 +139,7 @@ Pass CLI flags after the image name (e.g. `--civ 130`). For a different serial p
 docker run --rm -it \
   --device /dev/ttyUSB1 \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest --serial-port /dev/ttyUSB1
+  k1fm/wfweb --serial-port /dev/ttyUSB1
 ```
 
 ### USB audio (TX/RX through the radio's USB audio codec)
@@ -150,8 +150,22 @@ docker run --rm -it \
   --device /dev/snd \
   --group-add audio \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest
+  k1fm/wfweb
 ```
+
+### IC-7300 (original) via USB on Linux
+
+The original IC-7300 connects via USB, which provides both a serial port and a USB audio codec. Pass the serial device, the sound subsystem, and the `--audio-device` flag to route TX/RX audio through the radio:
+
+```bash
+docker run --rm -it \
+  --device /dev/ttyUSB1 \
+  --device /dev/snd --group-add audio \
+  -p 8080:8080 -p 8081:8081 \
+  k1fm/wfweb --serial-port /dev/ttyUSB1 --audio-device 'USB Audio CODEC'
+```
+
+Adjust `/dev/ttyUSB1` to match your system (`ls /dev/ttyUSB*` to find it).
 
 ### Building the image locally
 

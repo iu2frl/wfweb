@@ -14,7 +14,7 @@ No USB devices needed — just network access:
 ```bash
 docker run --rm -it \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest \
+  k1fm/wfweb \
   --lan 192.168.1.100 --lan-user admin --lan-pass secret --civ 130  # IC-7300 Mk2
 ```
 
@@ -26,7 +26,7 @@ Open `https://localhost:8080` in your browser (accept the self-signed certificat
 docker run --rm -it \
   --device /dev/ttyUSB0 \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest
+  k1fm/wfweb
 ```
 
 ### USB-connected radio with audio
@@ -39,7 +39,7 @@ docker run --rm -it \
   --device /dev/snd \
   --group-add audio \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest
+  k1fm/wfweb
 ```
 
 ---
@@ -60,7 +60,7 @@ Use `--serial-port` to specify the device path directly:
 docker run --rm -it \
   --device /dev/ttyUSB1 \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest --serial-port /dev/ttyUSB1
+  k1fm/wfweb --serial-port /dev/ttyUSB1
 ```
 
 ### Device remapping
@@ -73,7 +73,7 @@ docker run --rm -it \
   --device=/dev/ttyUSB1:/dev/ttyUSB0 \
   --group-add $(stat -c %g /dev/ttyUSB1) \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest
+  k1fm/wfweb
 ```
 
 The `--group-add` ensures the container process has permission to access the
@@ -115,7 +115,7 @@ in Wi-Fi mode, or any radio through a wfweb server):
 ```bash
 docker run --rm -it \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest \
+  k1fm/wfweb \
   --lan 192.168.1.100 \
   --lan-user admin \
   --lan-pass secret \
@@ -151,7 +151,7 @@ docker run --rm -it \
   --device /dev/ttyUSB0 \
   --device /dev/snd --group-add audio \
   -p 50001:50001/udp -p 50002:50002/udp -p 50003:50003/udp \
-  k1fm/wfweb:latest --serial-port /dev/ttyUSB0 --no-web
+  k1fm/wfweb --serial-port /dev/ttyUSB0 --no-web
 ```
 
 > **Note:** `-p 50001:50001` (without `/udp`) only maps TCP, which will not work.
@@ -176,7 +176,7 @@ Override the web server port with `-p` (CLI flag, not Docker's `-p`):
 ```bash
 docker run --rm -it \
   -p 9090:9090 -p 9091:9091 \
-  k1fm/wfweb:latest -p 9090
+  k1fm/wfweb -p 9090
 ```
 
 The REST port is always web port + 1.
@@ -194,7 +194,7 @@ docker run --rm -it \
   --device /dev/ttyUSB0 \
   --device /dev/snd --group-add audio \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest
+  k1fm/wfweb
 ```
 
 You can also supply a pre-made settings file:
@@ -204,7 +204,7 @@ docker run --rm -it \
   -v /path/to/my-wfweb.conf:/config/wfweb.conf:ro \
   --device /dev/ttyUSB0 \
   -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb:latest -s /config/wfweb.conf
+  k1fm/wfweb -s /config/wfweb.conf
 ```
 
 The TLS certificate is stored in `/root/.local/share/wfview/wfweb/`. Mount that
@@ -267,7 +267,7 @@ Example `docker-compose.yml` for a USB-connected radio with audio:
 ```yaml
 services:
   wfweb:
-    image: k1fm/wfweb:latest
+    image: k1fm/wfweb
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -290,7 +290,7 @@ For LAN mode:
 ```yaml
 services:
   wfweb:
-    image: k1fm/wfweb:latest
+    image: k1fm/wfweb
     restart: unless-stopped
     ports:
       - "8080:8080"
