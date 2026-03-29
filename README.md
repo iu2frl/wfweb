@@ -40,7 +40,7 @@ For radios connected via USB, download a pre-built binary from [GitHub Releases]
 | **Linux ARM64 / Raspberry Pi** | `.deb` (ubuntu2404) | Ubuntu 24.04 Noble |
 | **Linux ARM64 / Raspberry Pi** | `.deb` (debian12) | Raspberry Pi OS Bookworm / Debian 12 |
 | **Linux ARM64 / Raspberry Pi** | `.deb` (debian13) | Raspberry Pi OS Trixie / Debian 13 |
-| **macOS** | tarball | Apple Silicon |
+| **macOS** | zip | Apple Silicon |
 | **Windows** | zip | x86_64 |
 
 > **Which `.deb` do I need?** The tag in the filename tells you:
