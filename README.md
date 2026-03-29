@@ -32,10 +32,22 @@ The Docker image is multi-arch (`linux/amd64` and `linux/arm64`) — it runs on 
 
 For radios connected via USB, download a pre-built binary from [GitHub Releases](../../releases) for your platform:
 
-- **Linux x86_64** — tarball and `.deb`
-- **Linux ARM64 / Raspberry Pi** — tarball and `.deb`
-- **macOS (Apple Silicon)**
-- **Windows x86_64**
+| Platform | Package | Distro |
+|---|---|---|
+| **Linux x86_64** | `.deb` (ubuntu2404) | Ubuntu 24.04 Noble |
+| **Linux x86_64** | `.deb` (debian12) | Debian 12 Bookworm |
+| **Linux x86_64** | `.deb` (debian13) | Debian 13 Trixie |
+| **Linux ARM64 / Raspberry Pi** | `.deb` (ubuntu2404) | Ubuntu 24.04 Noble |
+| **Linux ARM64 / Raspberry Pi** | `.deb` (debian12) | Raspberry Pi OS Bookworm / Debian 12 |
+| **Linux ARM64 / Raspberry Pi** | `.deb` (debian13) | Raspberry Pi OS Trixie / Debian 13 |
+| **macOS** | tarball | Apple Silicon |
+| **Windows** | zip | x86_64 |
+
+> **Which `.deb` do I need?** The tag in the filename tells you:
+> **ubuntu2404** for Ubuntu 24.04,
+> **debian12** for Debian 12 Bookworm and Raspberry Pi OS Bookworm,
+> **debian13** for Debian 13 Trixie and Raspberry Pi OS Trixie.
+> Each is built natively on its target distro so the library dependencies match.
 
 Plug in your radio and run:
 

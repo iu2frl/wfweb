@@ -9,7 +9,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-linux:
+  build-linux-ubuntu2404:
     strategy:
       fail-fast: false
       matrix:
@@ -17,13 +17,11 @@ jobs:
           - os: ubuntu-24.04
             arch: x86_64
             deb_arch: amd64
-            label: Linux x86_64
           - os: ubuntu-24.04-arm
             arch: arm64
             deb_arch: arm64
-            label: Raspberry Pi / Linux ARM64
 
-    name: ${{ matrix.label }}
+    name: Ubuntu 24.04 (${{ matrix.deb_arch }})
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -52,25 +50,16 @@ jobs:
         id: version
         run: echo "version=$(grep 'WFWEB_VERSION' wfweb.pro | grep -oP '[\d.]+')" >> $GITHUB_OUTPUT
 
-      - name: Package tarball
-        run: |
-          sudo make install INSTALL_ROOT=$(pwd)/dist
-          sudo chown -R $(id -u):$(id -g) dist
-          tar czf wfweb-${{ matrix.arch }}.tar.gz -C dist .
-
       - name: Build .deb
         run: |
           VERSION=${{ steps.version.outputs.version }}
           DEB_ROOT=$(pwd)/deb-build/wfweb_${VERSION}_${{ matrix.deb_arch }}
 
-          # Mirror the install tree
           sudo make install INSTALL_ROOT=${DEB_ROOT}
           sudo chown -R $(id -u):$(id -g) $(pwd)/deb-build
 
-          # Create DEBIAN control directory
           mkdir -p ${DEB_ROOT}/DEBIAN
 
-          # Runtime dependencies
           cat > ${DEB_ROOT}/DEBIAN/control << EOF
           Package: wfweb
           Version: ${VERSION}
@@ -91,10 +80,8 @@ jobs:
            and Phil E. Taylor M0VSE (https://gitlab.com/eliggett/wfview).
           EOF
 
-          # Strip leading whitespace from control file (heredoc indentation)
           sed -i 's/^          //' ${DEB_ROOT}/DEBIAN/control
 
-          # postinst: reload systemd so the unit is recognised immediately
           printf '#!/bin/sh\nset -e\n' > ${DEB_ROOT}/DEBIAN/postinst
           printf 'if command -v systemctl >/dev/null 2>&1 && systemctl is-system-running --quiet 2>/dev/null; then\n' >> ${DEB_ROOT}/DEBIAN/postinst
           printf '    systemctl daemon-reload || true\nfi\n' >> ${DEB_ROOT}/DEBIAN/postinst
@@ -104,20 +91,206 @@ jobs:
 
           dpkg-deb --build --root-owner-group ${DEB_ROOT}
 
-          mv deb-build/wfweb_${VERSION}_${{ matrix.deb_arch }}.deb wfweb_${VERSION}_${{ matrix.deb_arch }}.deb
-
-      - name: Upload tarball artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: wfweb-${{ matrix.arch }}-tar
-          path: wfweb-${{ matrix.arch }}.tar.gz
-          retention-days: 30
+          mv deb-build/wfweb_${VERSION}_${{ matrix.deb_arch }}.deb \
+             wfweb_${VERSION}-ubuntu2404_${{ matrix.deb_arch }}.deb
 
       - name: Upload deb artifact
         uses: actions/upload-artifact@v7
         with:
-          name: wfweb-${{ matrix.arch }}-deb
-          path: wfweb_*_${{ matrix.deb_arch }}.deb
+          name: wfweb-${{ matrix.arch }}-ubuntu2404-deb
+          path: wfweb_*-ubuntu2404_${{ matrix.deb_arch }}.deb
+          retention-days: 30
+
+  build-linux-debian12:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x86_64
+            deb_arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            deb_arch: arm64
+
+    name: Debian 12 Bookworm (${{ matrix.deb_arch }})
+    runs-on: ${{ matrix.os }}
+    container: debian:bookworm
+
+    steps:
+      - name: Install git
+        run: |
+          apt-get update
+          apt-get install -y git
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: |
+          apt-get install -y \
+            qt5-qmake qtbase5-dev libqt5serialport5-dev \
+            qtmultimedia5-dev libqt5websockets5-dev \
+            libopus-dev libeigen3-dev \
+            portaudio19-dev librtaudio-dev \
+            libhidapi-dev libudev-dev libpulse-dev \
+            openssl dpkg-dev
+
+      - name: Build
+        run: |
+          qmake wfweb.pro
+          make -j$(nproc)
+
+      - name: Get version
+        id: version
+        run: echo "version=$(grep 'WFWEB_VERSION' wfweb.pro | grep -oP '[\d.]+')" >> $GITHUB_OUTPUT
+
+      - name: Build .deb
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          DEB_ROOT=$(pwd)/deb-build/wfweb_${VERSION}_${{ matrix.deb_arch }}
+
+          make install INSTALL_ROOT=${DEB_ROOT}
+
+          mkdir -p ${DEB_ROOT}/DEBIAN
+
+          cat > ${DEB_ROOT}/DEBIAN/control << EOF
+          Package: wfweb
+          Version: ${VERSION}
+          Architecture: ${{ matrix.deb_arch }}
+          Maintainer: Alain De Carolis <adecarolis@users.noreply.github.com>
+          Depends: openssl, libqt5core5a, libqt5gui5,
+           libqt5network5, libqt5serialport5, libqt5multimedia5,
+           libqt5websockets5,
+           libopus0, libportaudio2, libpulse0, libhidapi-libusb0,
+           libudev1, librtaudio6
+          Section: hamradio
+          Priority: optional
+          Homepage: https://github.com/adecarolis/wfweb
+          Description: wfview fork with built-in web interface for browser-based ham radio remote control.
+           wfweb adds an HTTPS/WebSocket server to wfview, enabling full radio
+           control and real-time audio streaming from any browser without
+           installing client software. Based on wfview by Elliott H. Liggett W6EL
+           and Phil E. Taylor M0VSE (https://gitlab.com/eliggett/wfview).
+          EOF
+
+          sed -i 's/^          //' ${DEB_ROOT}/DEBIAN/control
+
+          printf '#!/bin/sh\nset -e\n' > ${DEB_ROOT}/DEBIAN/postinst
+          printf 'if command -v systemctl >/dev/null 2>&1 && systemctl is-system-running --quiet 2>/dev/null; then\n' >> ${DEB_ROOT}/DEBIAN/postinst
+          printf '    systemctl daemon-reload || true\nfi\n' >> ${DEB_ROOT}/DEBIAN/postinst
+          printf 'echo "wfweb installed. To start automatically at boot, run:"\n' >> ${DEB_ROOT}/DEBIAN/postinst
+          printf 'echo "  systemctl enable --now wfweb@\$USER"\n' >> ${DEB_ROOT}/DEBIAN/postinst
+          chmod 755 ${DEB_ROOT}/DEBIAN/postinst
+
+          dpkg-deb --build --root-owner-group ${DEB_ROOT}
+
+          mv deb-build/wfweb_${VERSION}_${{ matrix.deb_arch }}.deb \
+             wfweb_${VERSION}-debian12_${{ matrix.deb_arch }}.deb
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wfweb-${{ matrix.arch }}-debian12-deb
+          path: wfweb_*-debian12_${{ matrix.deb_arch }}.deb
+          retention-days: 30
+
+  build-linux-debian13:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x86_64
+            deb_arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            deb_arch: arm64
+
+    name: Debian 13 Trixie (${{ matrix.deb_arch }})
+    runs-on: ${{ matrix.os }}
+    container: debian:trixie
+
+    steps:
+      - name: Install git
+        run: |
+          apt-get update
+          apt-get install -y git
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: |
+          apt-get install -y \
+            qt5-qmake qtbase5-dev libqt5serialport5-dev \
+            qtmultimedia5-dev libqt5websockets5-dev \
+            libopus-dev libeigen3-dev \
+            portaudio19-dev librtaudio-dev \
+            libhidapi-dev libudev-dev libpulse-dev \
+            openssl dpkg-dev
+
+      - name: Build
+        run: |
+          qmake wfweb.pro
+          make -j$(nproc)
+
+      - name: Get version
+        id: version
+        run: echo "version=$(grep 'WFWEB_VERSION' wfweb.pro | grep -oP '[\d.]+')" >> $GITHUB_OUTPUT
+
+      - name: Build .deb
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          DEB_ROOT=$(pwd)/deb-build/wfweb_${VERSION}_${{ matrix.deb_arch }}
+
+          make install INSTALL_ROOT=${DEB_ROOT}
+
+          mkdir -p ${DEB_ROOT}/DEBIAN
+
+          cat > ${DEB_ROOT}/DEBIAN/control << EOF
+          Package: wfweb
+          Version: ${VERSION}
+          Architecture: ${{ matrix.deb_arch }}
+          Maintainer: Alain De Carolis <adecarolis@users.noreply.github.com>
+          Depends: openssl, libqt5core5t64, libqt5gui5t64,
+           libqt5network5t64, libqt5serialport5, libqt5multimedia5,
+           libqt5websockets5,
+           libopus0, libportaudio2, libpulse0, libhidapi-libusb0,
+           libudev1, librtaudio7
+          Section: hamradio
+          Priority: optional
+          Homepage: https://github.com/adecarolis/wfweb
+          Description: wfview fork with built-in web interface for browser-based ham radio remote control.
+           wfweb adds an HTTPS/WebSocket server to wfview, enabling full radio
+           control and real-time audio streaming from any browser without
+           installing client software. Based on wfview by Elliott H. Liggett W6EL
+           and Phil E. Taylor M0VSE (https://gitlab.com/eliggett/wfview).
+          EOF
+
+          sed -i 's/^          //' ${DEB_ROOT}/DEBIAN/control
+
+          printf '#!/bin/sh\nset -e\n' > ${DEB_ROOT}/DEBIAN/postinst
+          printf 'if command -v systemctl >/dev/null 2>&1 && systemctl is-system-running --quiet 2>/dev/null; then\n' >> ${DEB_ROOT}/DEBIAN/postinst
+          printf '    systemctl daemon-reload || true\nfi\n' >> ${DEB_ROOT}/DEBIAN/postinst
+          printf 'echo "wfweb installed. To start automatically at boot, run:"\n' >> ${DEB_ROOT}/DEBIAN/postinst
+          printf 'echo "  systemctl enable --now wfweb@\$USER"\n' >> ${DEB_ROOT}/DEBIAN/postinst
+          chmod 755 ${DEB_ROOT}/DEBIAN/postinst
+
+          dpkg-deb --build --root-owner-group ${DEB_ROOT}
+
+          mv deb-build/wfweb_${VERSION}_${{ matrix.deb_arch }}.deb \
+             wfweb_${VERSION}-debian13_${{ matrix.deb_arch }}.deb
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wfweb-${{ matrix.arch }}-debian13-deb
+          path: wfweb_*-debian13_${{ matrix.deb_arch }}.deb
           retention-days: 30
 
   build-macos:
@@ -237,7 +410,7 @@ jobs:
 
   release:
     name: Publish release
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux-ubuntu2404, build-linux-debian12, build-linux-debian13, build-macos, build-windows]
     runs-on: ubuntu-24.04
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -251,10 +424,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            wfweb-x86_64-tar/wfweb-x86_64.tar.gz
-            wfweb-arm64-tar/wfweb-arm64.tar.gz
-            wfweb-x86_64-deb/*.deb
-            wfweb-arm64-deb/*.deb
+            wfweb-x86_64-ubuntu2404-deb/*.deb
+            wfweb-arm64-ubuntu2404-deb/*.deb
+            wfweb-x86_64-debian12-deb/*.deb
+            wfweb-arm64-debian12-deb/*.deb
+            wfweb-x86_64-debian13-deb/*.deb
+            wfweb-arm64-debian13-deb/*.deb
             wfweb-macos-arm64/wfweb-macos-arm64.tar.gz
             wfweb-windows-x86_64/wfweb-windows-x86_64.zip
           generate_release_notes: true

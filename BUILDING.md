@@ -16,6 +16,21 @@ sudo apt-get install -y \
     openssl
 ```
 
+### Clone
+
+The repository uses a git submodule for the FT8/FT4 decoder. Make sure to
+initialise it when cloning:
+
+```bash
+git clone --recursive https://github.com/adecarolis/wfweb.git
+```
+
+If you already cloned without `--recursive`:
+
+```bash
+git submodule update --init
+```
+
 ### Build
 
 ```bash
