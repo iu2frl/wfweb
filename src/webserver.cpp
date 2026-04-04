@@ -1,8 +1,9 @@
 #include "webserver.h"
+#ifdef FREEDV_SUPPORT
 #include "freedvprocessor.h"
-#include "logcategories.h"
-
 #include <codec2/freedv_api.h>
+#endif
+#include "logcategories.h"
 
 #include <QStandardPaths>
 #include <QDir>
@@ -63,10 +64,12 @@ webServer::~webServer()
     if (freedvTxDrainTimer) {
         freedvTxDrainTimer->stop();
     }
+#ifdef FREEDV_SUPPORT
     if (freedvThread) {
         freedvThread->quit();
         freedvThread->wait();
     }
+#endif
 #ifdef RADE_SUPPORT
     if (radeThread) {
         if (radeProcessor) radeProcessor->stopRequested.store(true);
@@ -1218,7 +1221,11 @@ void webServer::onWsBinaryMessage(QByteArray message)
             emit sendToRadeTx(pkt);
         else
 #endif
+#ifdef FREEDV_SUPPORT
             emit sendToFreeDVTx(pkt);
+#else
+        {}  // no codec available
+#endif
         return;
     }
 
@@ -1702,12 +1709,15 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
             if (modeName == "RADE" && radeProcessor) {
                 freedvModeName = modeName;
                 freedvEnabled = true;
+#ifdef FREEDV_SUPPORT
                 if (freedvProcessor)
                     QMetaObject::invokeMethod(freedvProcessor, "cleanup", Qt::QueuedConnection);
+#endif
                 emit setupRade(rigSampleRate);
                 qInfo() << "Web: RADE enabled";
             } else
 #endif
+#ifdef FREEDV_SUPPORT
             if (freedvProcessor) {
                 int mode = -1;
                 if (modeName == "700D") mode = FREEDV_MODE_700D;
@@ -1726,6 +1736,7 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
                     qInfo() << "Web: FreeDV enabled, mode=" << modeName;
                 }
             }
+#endif
         } else {
             freedvEnabled = false;
             freedvSync = false;
@@ -1733,8 +1744,10 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
             freedvTxBuffer.clear();
             freedvTxActive = false;
             if (freedvTxDrainTimer) freedvTxDrainTimer->stop();
+#ifdef FREEDV_SUPPORT
             if (freedvProcessor)
                 QMetaObject::invokeMethod(freedvProcessor, "cleanup", Qt::QueuedConnection);
+#endif
 #ifdef RADE_SUPPORT
             freedvFreqOffset = 0.0f;
             if (radeProcessor) {
@@ -1799,9 +1812,11 @@ QJsonObject webServer::buildInfoJson() const
 #ifdef RADE_SUPPORT
         fdvModes.append("RADE");
 #endif
+#ifdef FREEDV_SUPPORT
         fdvModes.append("700D");
         fdvModes.append("700E");
         fdvModes.append("1600");
+#endif
         info["freedvModes"] = fdvModes;
         info["hasFilterSettings"] = rigCaps->commands.contains(funcPBTInner);
         info["hasPowerControl"] = rigCaps->commands.contains(funcPowerControl);
@@ -2464,6 +2479,7 @@ void webServer::setupAudio(quint8 codec, quint32 sampleRate)
     txAudioConfigured = true;
     audioConfigured = true;
 
+#ifdef FREEDV_SUPPORT
     // FreeDV processor thread (created once, activated on demand)
     freedvProcessor = new FreeDVProcessor();
     freedvThread = new QThread(this);
@@ -2479,6 +2495,7 @@ void webServer::setupAudio(quint8 codec, quint32 sampleRate)
     connect(freedvThread, &QThread::finished, freedvProcessor, &QObject::deleteLater);
 
     freedvThread->start();
+#endif
 
 #ifdef RADE_SUPPORT
     // RADE V1 processor thread (created once, activated on demand)
@@ -2521,12 +2538,17 @@ void webServer::receiveRxAudio(audioPacket audio)
             emit sendToRadeRx(audio);
         else
 #endif
+#ifdef FREEDV_SUPPORT
             emit sendToFreeDVRx(audio);
+#else
+        {}  // no codec available
+#endif
     } else {
         emit sendToConverter(audio);
     }
 }
 
+#ifdef FREEDV_SUPPORT
 void webServer::onFreeDVRxReady(audioPacket audio)
 {
     if (rxConverter) {
@@ -2609,6 +2631,7 @@ void webServer::onFreeDVTxReady(audioPacket audio)
         emit sendToTxConverter(audio);
     }
 }
+#endif // FREEDV_SUPPORT
 
 void webServer::drainFreeDVTxBuffer()
 {
@@ -2633,6 +2656,7 @@ void webServer::drainFreeDVTxBuffer()
     }
 }
 
+#ifdef FREEDV_SUPPORT
 void webServer::onFreeDVStats(float snr, bool sync)
 {
     freedvSNR = snr;
@@ -2646,6 +2670,7 @@ void webServer::onFreeDVStats(float snr, bool sync)
         sendJsonToAll(notify);
     }
 }
+#endif // FREEDV_SUPPORT
 
 #ifdef RADE_SUPPORT
 void webServer::onRadeRxReady(audioPacket audio)
@@ -2898,6 +2923,7 @@ void webServer::setupUsbAudio(quint32 sampleRate)
 
     audioConfigured = true;
 
+#ifdef FREEDV_SUPPORT
     // FreeDV processor thread (created once, activated on demand)
     if (!freedvProcessor) {
         freedvProcessor = new FreeDVProcessor();
@@ -2915,6 +2941,7 @@ void webServer::setupUsbAudio(quint32 sampleRate)
 
         freedvThread->start();
     }
+#endif
 
 #ifdef RADE_SUPPORT
     // RADE V1 processor thread (created once, activated on demand)
@@ -3083,7 +3110,11 @@ void webServer::readUsbAudio()
             emit sendToRadeRx(pkt);
         else
 #endif
+#ifdef FREEDV_SUPPORT
             emit sendToFreeDVRx(pkt);
+#else
+        {}  // no codec available
+#endif
         return;
     }
 

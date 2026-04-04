@@ -169,8 +169,8 @@ unix:systemd.files = systemd/wfweb@.service
 unix:systemd.path = $$PREFIX/lib/systemd/system
 INSTALLS += systemd
 
-linux:LIBS += -L./ -lopus -lcodec2
-macx:LIBS += -framework CoreAudio -framework CoreFoundation -lpthread -lopus -lssl -lcrypto -lcodec2
+linux:LIBS += -L./ -lopus
+macx:LIBS += -framework CoreAudio -framework CoreFoundation -lpthread -lopus -lssl -lcrypto
 
 # RADE V1 (radae_nopy) support.
 # Auto-detects the radae_nopy submodule; override with RADAE_DIR env var or qmake arg.
@@ -197,6 +197,32 @@ isEmpty(RADAE_DIR): exists($$PWD/radae_nopy/src/rade_api.h): RADAE_DIR = $$PWD/r
     }
 }
 
+# FreeDV (codec2) support — auto-detect via pkg-config or header presence
+linux|macx {
+    system(pkg-config --exists codec2) {
+        DEFINES += FREEDV_SUPPORT
+        LIBS += -lcodec2
+        SOURCES += src/freedvprocessor.cpp
+        HEADERS += include/freedvprocessor.h
+        message("FreeDV codec2 support enabled")
+    } else {
+        message("FreeDV codec2 not found — codec2 modes (700D/700E/1600) disabled")
+    }
+}
+win32 {
+    !isEmpty(VCPKG_DIR) {
+        exists($$VCPKG_DIR/lib/codec2.lib) | exists($$VCPKG_DIR/lib/libcodec2.a) {
+            DEFINES += FREEDV_SUPPORT
+            LIBS += -lcodec2
+            SOURCES += src/freedvprocessor.cpp
+            HEADERS += include/freedvprocessor.h
+            message("FreeDV codec2 support enabled")
+        } else {
+            message("FreeDV codec2 not found — codec2 modes (700D/700E/1600) disabled")
+        }
+    }
+}
+
 contains(DEFINES,FTDI_SUPPORT){
   win32:INCLUDEPATH += ../LibFT4222-v1.4.7\imports\LibFT4222\inc
   win32:INCLUDEPATH += ../LibFT4222-v1.4.7\imports\ftd2xx
@@ -211,7 +237,7 @@ win32 {
         INCLUDEPATH += $$VCPKG_DIR/include/opus
         INCLUDEPATH += $$VCPKG_DIR/include/hidapi
         LIBS += -L$$VCPKG_DIR/lib
-        LIBS += -lportaudio -lopus -lhidapi -llibssl -llibcrypto -lcodec2
+        LIBS += -lportaudio -lopus -lhidapi -llibssl -llibcrypto
     } else {
         INCLUDEPATH += ../opus/include
     }
@@ -267,8 +293,7 @@ SOURCES += \
     src/rigserver.cpp \
     src/ft4222handler.cpp \
     src/rtpaudio.cpp \
-    src/webserver.cpp \
-    src/freedvprocessor.cpp
+    src/webserver.cpp
 
 macx:SOURCES += src/tlsproxy.cpp
 
@@ -322,7 +347,6 @@ HEADERS  += \
     include/yaesuudpcat.h \
     include/yaesuudpcontrol.h \
     include/yaesuudpscope.h \
-    include/webserver.h \
-    include/freedvprocessor.h
+    include/webserver.h
 
 macx:HEADERS += include/tlsproxy.h

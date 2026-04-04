@@ -31,7 +31,9 @@
 
 #include "cachingqueue.h"
 #include "audioconverter.h"
+#ifdef FREEDV_SUPPORT
 #include "freedvprocessor.h"
+#endif
 #ifdef RADE_SUPPORT
 #include "radeprocessor.h"
 #endif
@@ -81,9 +83,11 @@ signals:
                           quint8 opusComplexity, quint8 resampleQuality);
     void sendToTxConverter(audioPacket audio);
     void haveTxAudioData(audioPacket audio);
+#ifdef FREEDV_SUPPORT
     void setupFreeDV(int mode, quint32 radioSampleRate);
     void sendToFreeDVRx(audioPacket audio);
     void sendToFreeDVTx(audioPacket audio);
+#endif
 #ifdef RADE_SUPPORT
     void setupRade(quint32 radioSampleRate);
     void sendToRadeRx(audioPacket audio);
@@ -122,10 +126,12 @@ private slots:
     void readUsbAudio();
     void onAudioStateChanged(QAudio::State state);
 
-    // FreeDV
+#ifdef FREEDV_SUPPORT
+    // FreeDV codec2
     void onFreeDVRxReady(audioPacket audio);
     void onFreeDVTxReady(audioPacket audio);
     void onFreeDVStats(float snr, bool sync);
+#endif
     void drainFreeDVTxBuffer();
 
 #ifdef RADE_SUPPORT
@@ -227,8 +233,10 @@ private:
     QWebSocket *micActiveClient = nullptr;
 
     // FreeDV processing
+#ifdef FREEDV_SUPPORT
     FreeDVProcessor *freedvProcessor = nullptr;
     QThread *freedvThread = nullptr;
+#endif
     bool freedvEnabled = false;
     int freedvMode = 0;
 #ifdef RADE_SUPPORT
