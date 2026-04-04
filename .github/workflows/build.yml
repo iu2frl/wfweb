@@ -71,6 +71,10 @@ jobs:
           mkdir -p ${DEB_ROOT}/usr/lib
           cp radae_nopy/build/src/librade.so* ${DEB_ROOT}/usr/lib/
 
+          # Install license files
+          mkdir -p ${DEB_ROOT}/usr/share/doc/wfweb
+          cp LICENSE THIRD_PARTY_LICENSES ${DEB_ROOT}/usr/share/doc/wfweb/
+
           mkdir -p ${DEB_ROOT}/DEBIAN
 
           cat > ${DEB_ROOT}/DEBIAN/control << EOF
@@ -179,6 +183,10 @@ jobs:
           # Bundle librade.so
           mkdir -p ${DEB_ROOT}/usr/lib
           cp radae_nopy/build/src/librade.so* ${DEB_ROOT}/usr/lib/
+
+          # Install license files
+          mkdir -p ${DEB_ROOT}/usr/share/doc/wfweb
+          cp LICENSE THIRD_PARTY_LICENSES ${DEB_ROOT}/usr/share/doc/wfweb/
 
           mkdir -p ${DEB_ROOT}/DEBIAN
 
@@ -289,6 +297,10 @@ jobs:
           mkdir -p ${DEB_ROOT}/usr/lib
           cp radae_nopy/build/src/librade.so* ${DEB_ROOT}/usr/lib/
 
+          # Install license files
+          mkdir -p ${DEB_ROOT}/usr/share/doc/wfweb
+          cp LICENSE THIRD_PARTY_LICENSES ${DEB_ROOT}/usr/share/doc/wfweb/
+
           mkdir -p ${DEB_ROOT}/DEBIAN
 
           cat > ${DEB_ROOT}/DEBIAN/control << EOF
@@ -369,6 +381,7 @@ jobs:
           mkdir -p wfweb-macos-arm64
           cp wfweb wfweb-macos-arm64/
           cp -r rigs wfweb-macos-arm64/
+          cp LICENSE THIRD_PARTY_LICENSES wfweb-macos-arm64/
           # Bundle librade for distribution (rpath @executable_path set at build time)
           if [ -f radae_nopy/build/src/librade.dylib ]; then
             cp radae_nopy/build/src/librade*.dylib wfweb-macos-arm64/
@@ -446,6 +459,10 @@ jobs:
           # Rig files
           New-Item -ItemType Directory -Force -Path "$out\rigs" | Out-Null
           Copy-Item "rigs\*.rig" "$out\rigs\" -Force
+
+          # License files
+          Copy-Item "LICENSE" "$out\" -Force
+          Copy-Item "THIRD_PARTY_LICENSES" "$out\" -Force
 
       - name: Create ZIP
         shell: pwsh

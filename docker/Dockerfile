@@ -59,6 +59,7 @@ COPY --from=builder /usr/lib/*/librtaudio.so.6* /usr/lib/
 RUN ldconfig
 COPY --from=builder /install/usr/local /usr/local
 COPY --from=builder /install/usr/lib/librade* /usr/lib/
+COPY --from=builder /src/LICENSE /src/THIRD_PARTY_LICENSES /usr/share/doc/wfweb/
 RUN ldconfig
 
 ENV QT_QPA_PLATFORM=offscreen
