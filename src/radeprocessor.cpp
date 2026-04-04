@@ -387,9 +387,11 @@ void RadeProcessor::processTx(audioPacket audio)
 
             if (nOut > 0) {
                 // Convert complex IQ -> real modem PCM (extract real part)
+                // Scale down to match codec2 FreeDV output levels (~5% ALC)
+                static constexpr float RADE_TX_SCALE = 0.33f;
                 QVector<qint16> modemOut(nOut);
                 for (int i = 0; i < nOut; i++) {
-                    float v = iqOut[i].real * 32768.0f;
+                    float v = iqOut[i].real * 32768.0f * RADE_TX_SCALE;
                     if (v > 32767.0f) v = 32767.0f;
                     if (v < -32767.0f) v = -32767.0f;
                     modemOut[i] = (qint16)v;
