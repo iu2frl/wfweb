@@ -40,7 +40,7 @@ jobs:
             portaudio19-dev librtaudio-dev \
             libhidapi-dev libudev-dev libpulse-dev \
             libcodec2-dev \
-            cmake autoconf automake libtool \
+            cmake autoconf automake libtool curl \
             openssl dpkg-dev
 
       - name: Build RADE
@@ -150,7 +150,7 @@ jobs:
             portaudio19-dev librtaudio-dev \
             libhidapi-dev libudev-dev libpulse-dev \
             libcodec2-dev \
-            cmake autoconf automake libtool \
+            cmake autoconf automake libtool curl \
             openssl dpkg-dev
 
       - name: Build RADE
@@ -259,7 +259,7 @@ jobs:
             portaudio19-dev librtaudio-dev \
             libhidapi-dev libudev-dev libpulse-dev \
             libcodec2-dev \
-            cmake autoconf automake libtool \
+            cmake autoconf automake libtool curl \
             openssl dpkg-dev
 
       - name: Build RADE
