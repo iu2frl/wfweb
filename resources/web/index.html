@@ -2836,9 +2836,14 @@ function updateOtherVfoDisplay() {
     }
 }
 
+function updateModeBtnLabel() {
+    var label = currentMode;
+    if (freedvEnabled) label += ' | ' + freedvModeName;
+    document.getElementById('modeBtn').textContent = label;
+}
 function updateMode(mode) {
     currentMode = mode;
-    document.getElementById('modeBtn').textContent = mode;
+    updateModeBtnLabel();
     if (currentPanel === 'mode') renderModeOverlay();
     updateFilterConfig();
     if (currentPanel === 'filter') renderFilterOverlay();
@@ -3578,6 +3583,12 @@ function renderModeOverlay() {
     ft8Btn.textContent = 'FT8';
     ft8Btn.onclick = function() { setPanel('default'); toggleDigiBar(); };
     grid.appendChild(ft8Btn);
+    // FreeDV — overlay mode (works on top of LSB/USB/AM/FM)
+    var fdvBtn = document.createElement('button');
+    fdvBtn.className = 'ov-btn' + (freedvEnabled ? ' active' : '');
+    fdvBtn.innerHTML = '<span class="btn-label">FreeDV</span><span class="btn-state">' + (freedvEnabled ? freedvModeName : 'OFF') + '</span>';
+    fdvBtn.onclick = function() { toggleFreeDV(); renderModeOverlay(); };
+    grid.appendChild(fdvBtn);
     // Back button
     var back = document.createElement('button');
     back.className = 'ov-btn back-btn';
@@ -3673,11 +3684,6 @@ function renderFuncOverlay() {
         fbtn.onclick = (function(n) { return function() { send({ cmd: 'setFilter', value: n }); }; })(filters[f].num);
         grid.appendChild(fbtn);
     }
-
-    // FreeDV
-    grid.appendChild(makeFuncBtn('FreeDV', freedvEnabled ? freedvModeName : 'OFF', freedvEnabled, function() {
-        toggleFreeDV();
-    }));
 
     // Memory browser
     grid.appendChild(makeFuncBtn('MEM', '', false, function() {
@@ -4206,6 +4212,10 @@ function updateFreeDVStatus(msg) {
     } else {
         indicator.style.display = 'none';
     }
+
+    // Update mode button and mode overlay to reflect FreeDV state
+    updateModeBtnLabel();
+    if (currentPanel === 'mode') renderModeOverlay();
 
     // Re-render func overlay if visible
     if (currentPanel === 'func') renderFuncOverlay();
