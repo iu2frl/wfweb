@@ -1421,6 +1421,10 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
         bool on = cmd["value"].toBool();
         queue->add(priorityImmediate, queueItem(funcMonitor, QVariant::fromValue<uchar>(on ? 1 : 0), false, 0));
     }
+    else if (type == "setMonitorGain") {
+        ushort val = static_cast<ushort>(qBound(0, cmd["value"].toInt(), 255));
+        queue->addUnique(priorityImmediate, queueItem(funcMonitorGain, QVariant::fromValue<ushort>(val), false, 0));
+    }
     else if (type == "setTuner") {
         // value: 0=off, 1=on, 2=start tuning
         uchar val = static_cast<uchar>(qBound(0, cmd["value"].toInt(), 2));
@@ -2007,6 +2011,12 @@ QJsonObject webServer::buildStatusJson()
         status["split"] = split.value.toBool();
     }
 
+    // Monitor
+    cacheItem mon = queue->getCache(funcMonitor, 0);
+    if (mon.value.isValid()) status["monitor"] = mon.value.toBool();
+    cacheItem monGain = queue->getCache(funcMonitorGain, 0);
+    if (monGain.value.isValid()) status["monitorGain"] = monGain.value.toInt();
+
     // Tuner (0=off, 1=on, 2=tuning)
     cacheItem tuner = queue->getCache(funcTunerStatus, 0);
     if (tuner.value.isValid()) status["tuner"] = tuner.value.toInt();
@@ -2143,6 +2153,12 @@ void webServer::receiveCache(cacheItem item)
         sendBinaryToAll(msg);
         return; // Don't send as JSON
     }
+    case funcMonitor:
+        update["monitor"] = item.value.toBool();
+        break;
+    case funcMonitorGain:
+        update["monitorGain"] = item.value.toInt();
+        break;
     case funcSplitStatus:
         update["split"] = item.value.toBool();
         break;

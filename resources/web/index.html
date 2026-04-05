@@ -2272,6 +2272,12 @@ body.digi-open .digi-bar {
                     <input type="range" id="micGainSlider" min="0" max="255" value="128"></div>
                 <span class="gain-val" id="micGainVal">128</span>
             </div>
+            <div class="gain-row">
+                <span class="gain-label">MON</span>
+                <div class="gain-bar-bg"><div class="gain-bar-fill" id="monitorLevelFill" style="width:50%"></div>
+                    <input type="range" id="monitorLevelSlider" min="0" max="255" value="128"></div>
+                <span class="gain-val" id="monitorLevelVal">128</span>
+            </div>
             <div class="gain-back-row">
                 <button class="ov-btn back-btn" onclick="setPanel('default')">&#x21A9;</button>
             </div>
@@ -2415,6 +2421,8 @@ var micStream = null;
 var micAudioCtx = null;
 var micWorkletNode = null;
 var micSeq = 0;
+var monitorEnabled = false;
+var monitorLevel = 128; // 0-255 (radio gain)
 
 var nbOn = false;
 var nrOn = false;
@@ -2700,6 +2708,8 @@ function handleMessage(msg) {
             if (msg.rfPower !== undefined) updateSlider('rfPower', msg.rfPower);
             if (msg.squelch !== undefined) updateSlider('squelch', msg.squelch);
             if (msg.micGain !== undefined) updateSlider('micGain', msg.micGain);
+            if (msg.monitor !== undefined) { monitorEnabled = msg.monitor; if (currentPanel === 'func') renderFuncOverlay(); }
+            if (msg.monitorGain !== undefined) { monitorLevel = msg.monitorGain; updateSlider('monitorLevel', msg.monitorGain); if (currentPanel === 'func') renderFuncOverlay(); }
             if (msg.split !== undefined) updateSplit(msg.split);
             if (msg.spanIndex !== undefined) updateSpanIndex(msg.spanIndex);
             if (msg.nb !== undefined) updateToggle('nb', msg.nb);
@@ -2745,6 +2755,8 @@ function handleMessage(msg) {
             if (msg.rfPower !== undefined) updateSlider('rfPower', msg.rfPower);
             if (msg.squelch !== undefined) updateSlider('squelch', msg.squelch);
             if (msg.micGain !== undefined) updateSlider('micGain', msg.micGain);
+            if (msg.monitor !== undefined) { monitorEnabled = msg.monitor; if (currentPanel === 'func') renderFuncOverlay(); }
+            if (msg.monitorGain !== undefined) { monitorLevel = msg.monitorGain; updateSlider('monitorLevel', msg.monitorGain); if (currentPanel === 'func') renderFuncOverlay(); }
             if (msg.split !== undefined) updateSplit(msg.split);
             if (msg.spanIndex !== undefined) updateSpanIndex(msg.spanIndex);
             if (msg.nb !== undefined) updateToggle('nb', msg.nb);
@@ -3078,6 +3090,25 @@ function initSliderTracking() {
             else if (name === 'micGain') throttledSend('micGain', 'setMicGain', val);
         });
     });
+    // Monitor level slider (CI-V, 0-255)
+    (function() {
+        var slider = document.getElementById('monitorLevelSlider');
+        if (!slider) return;
+        slider.addEventListener('mousedown', function() { sliderDragging['monitorLevel'] = true; });
+        slider.addEventListener('touchstart', function() { sliderDragging['monitorLevel'] = true; });
+        slider.addEventListener('mouseup', function() { sliderDragging['monitorLevel'] = false; });
+        slider.addEventListener('touchend', function() { sliderDragging['monitorLevel'] = false; });
+        slider.addEventListener('mouseleave', function() { sliderDragging['monitorLevel'] = false; });
+        slider.addEventListener('touchcancel', function() { sliderDragging['monitorLevel'] = false; });
+        slider.addEventListener('input', function() {
+            var val = parseInt(slider.value);
+            monitorLevel = val;
+            document.getElementById('monitorLevelVal').textContent = val;
+            document.getElementById('monitorLevelFill').style.width = (val / 255 * 100) + '%';
+            throttledSend('monitorLevel', 'setMonitorGain', val);
+            if (currentPanel === 'func') renderFuncOverlay();
+        });
+    })();
     // Filter overlay sliders
     ['filterWidth', 'pbtInner', 'pbtOuter'].forEach(function(name) {
         var slider = document.getElementById(name + 'Slider');
@@ -3724,6 +3755,13 @@ function renderFuncOverlay() {
     // Memory browser
     grid.appendChild(makeFuncBtn('MEM', '', false, function() {
         openMemoryBrowser();
+    }));
+
+    // Monitor (TX sidetone)
+    grid.appendChild(makeFuncBtn('MON', monitorEnabled ? monitorLevel : 'OFF', monitorEnabled, function() {
+        monitorEnabled = !monitorEnabled;
+        send({ cmd: 'setMonitor', value: monitorEnabled });
+        renderFuncOverlay();
     }));
 
     // Fill remaining slots + back
@@ -4463,7 +4501,6 @@ function startMic() {
             URL.revokeObjectURL(url);
             micWorkletNode = new AudioWorkletNode(micAudioCtx, 'wfweb-capture-processor');
             source.connect(micWorkletNode);
-            micWorkletNode.connect(micAudioCtx.destination);
             micWorkletNode.port.onmessage = function(e) {
                 // Suppress during DIGI TX (FT8 audio uses same type-0x03 channel)
                 if (!micEnabled || !ws || ws.readyState !== WebSocket.OPEN || digiTxActive) return;
