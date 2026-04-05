@@ -2,7 +2,7 @@
 
 **Control your Icom radio from any browser — phone, tablet, or desktop.**
 
-wfweb turns your transceiver into a web-accessible station. Waterfall, audio, CW decoding, FT8/FT4, FreeDV digital voice, and RADE — all in the browser, no client software required.
+wfweb turns your transceiver into a web-accessible station. Waterfall, SSB, CW decoding, FT8/FT4, [FreeDV digital voice](https://youtu.be/AWdHcyiOOnY), and RADE — all in the browser, no client software required.
 
 ![FT8 digital mode panel](ft8.png)
 
