@@ -174,20 +174,27 @@ macx:LIBS += -framework CoreAudio -framework CoreFoundation -lpthread -lopus -ls
 
 # RADE V1 (radae_nopy) support.
 # Auto-detects the radae_nopy submodule; override with RADAE_DIR env var or qmake arg.
-# Build radae_nopy first: cd radae_nopy/build && cmake -DCMAKE_BUILD_TYPE=Release .. && make
+# Build radae_nopy first:
+#   Linux/macOS: cd radae_nopy/build && cmake -DCMAKE_BUILD_TYPE=Release .. && make
+#   Windows:     build custom Opus with cmake (see BUILDING-WINDOWS.md)
 isEmpty(RADAE_DIR): RADAE_DIR = $$(RADAE_DIR)
 isEmpty(RADAE_DIR): exists($$PWD/radae_nopy/src/rade_api.h): RADAE_DIR = $$PWD/radae_nopy
 !isEmpty(RADAE_DIR) {
     isEmpty(RADAE_BUILD): RADAE_BUILD = $$RADAE_DIR/build
-    exists($$RADAE_BUILD/src/librade.so) | exists($$RADAE_BUILD/src/librade.dylib) | exists($$RADAE_BUILD/build_opus-prefix/src/build_opus/.libs/libopus.a) {
+    # Check for built artifacts (platform-specific paths)
+    OPUS_AUTOTOOLS = $$RADAE_BUILD/build_opus-prefix/src/build_opus/.libs/libopus.a
+    OPUS_MSVC_LIB = $$RADAE_BUILD/opus_msvc_build/Release/opus.lib
+    exists($$RADAE_BUILD/src/librade.so) | exists($$RADAE_BUILD/src/librade.dylib) | exists($$OPUS_AUTOTOOLS) | exists($$OPUS_MSVC_LIB) {
         DEFINES += RADE_SUPPORT
         INCLUDEPATH += $$RADAE_DIR/src
         # Custom Opus headers (LPCNet/FARGAN) from the CMake ExternalProject
         OPUS_SRC = $$RADAE_BUILD/build_opus-prefix/src/build_opus
         INCLUDEPATH += $$OPUS_SRC/dnn $$OPUS_SRC/celt $$OPUS_SRC/include $$OPUS_SRC
-        macx {
-            # macOS: compile rade sources directly into the binary (no dylib to sign)
-            DEFINES += IS_BUILDING_RADE_API=1 RADE_PYTHON_FREE=1
+        macx|win32 {
+            # macOS/Windows: compile rade sources directly into the binary (static link)
+            macx:  DEFINES += IS_BUILDING_RADE_API=1
+            win32: DEFINES += RADE_STATIC=1
+            DEFINES += RADE_PYTHON_FREE=1
             SOURCES += \
                 $$RADAE_DIR/src/rade_api_nopy.c \
                 $$RADAE_DIR/src/rade_enc.c \
@@ -201,12 +208,18 @@ isEmpty(RADAE_DIR): exists($$PWD/radae_nopy/src/rade_api.h): RADAE_DIR = $$PWD/r
                 $$RADAE_DIR/src/rade_tx.c \
                 $$RADAE_DIR/src/rade_rx.c
         } else {
-            # Linux/Windows: link shared library
+            # Linux: link shared library
             LIBS += -L$$RADAE_BUILD/src -lrade
             QMAKE_RPATHDIR += $$RADAE_BUILD/src
         }
-        # Custom Opus (with LPCNet/FARGAN) built by radae_nopy - link statically
-        LIBS += $$RADAE_BUILD/build_opus-prefix/src/build_opus/.libs/libopus.a
+        # Custom Opus (with LPCNet/FARGAN) - replace standard opus with custom build
+        win32 {
+            LIBS -= -lopus
+            exists($$OPUS_MSVC_LIB): LIBS += $$OPUS_MSVC_LIB
+            else: LIBS += $$OPUS_AUTOTOOLS
+        } else {
+            LIBS += $$OPUS_AUTOTOOLS
+        }
         SOURCES += src/radeprocessor.cpp
         HEADERS += include/radeprocessor.h
         message("RADE V1 support enabled ($$RADAE_DIR)")
@@ -255,7 +268,11 @@ win32 {
         INCLUDEPATH += $$VCPKG_DIR/include/opus
         INCLUDEPATH += $$VCPKG_DIR/include/hidapi
         LIBS += -L$$VCPKG_DIR/lib
-        LIBS += -lportaudio -lopus -lhidapi -llibssl -llibcrypto
+        contains(DEFINES, RADE_SUPPORT) {
+            LIBS += -lportaudio -lhidapi -llibssl -llibcrypto
+        } else {
+            LIBS += -lportaudio -lopus -lhidapi -llibssl -llibcrypto
+        }
     } else {
         INCLUDEPATH += ../opus/include
     }

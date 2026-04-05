@@ -412,7 +412,7 @@ jobs:
           arch: 'win64_msvc2019_64'
 
       - name: Install vcpkg packages
-        run: vcpkg install eigen3:x64-windows opus:x64-windows portaudio:x64-windows hidapi:x64-windows openssl:x64-windows
+        run: vcpkg install eigen3:x64-windows portaudio:x64-windows hidapi:x64-windows openssl:x64-windows
 
       - name: Clone rtaudio
         run: git clone --depth 1 https://github.com/thestk/rtaudio.git ..\rtaudio
@@ -421,6 +421,74 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+
+      - name: Build RADE custom Opus (MSYS2)
+        shell: C:\msys64\usr\bin\bash.exe -l {0}
+        run: |
+          pacman -S --noconfirm autoconf automake libtool make patch gcc cmake
+          cd "$GITHUB_WORKSPACE/radae_nopy"
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(nproc)
+
+      - name: Patch Opus headers for MSVC
+        shell: pwsh
+        run: |
+          $nnet = "radae_nopy\build\build_opus-prefix\src\build_opus\dnn\nnet.h"
+          (Get-Content $nnet -Raw) -replace `
+            '#define RADE_EXPORT __attribute__\(\(visibility\("default"\)\)\)', `
+            "#ifdef _MSC_VER`n    #define RADE_EXPORT`n  #else`n    #define RADE_EXPORT __attribute__((visibility(""default"")))`n  #endif" `
+            | Set-Content $nnet
+
+          $api = "radae_nopy\src\rade_api.h"
+          (Get-Content $api -Raw) -replace `
+            '#if IS_BUILDING_RADE_API', `
+            "#if defined(RADE_STATIC)`n#define RADE_EXPORT`n#elif IS_BUILDING_RADE_API" `
+            | Set-Content $api
+
+      - name: Build custom Opus (MSVC)
+        shell: cmd
+        run: |
+          cmake -S radae_nopy\build\build_opus-prefix\src\build_opus -B radae_nopy\build\opus_msvc_build -DOPUS_DRED=ON -DOPUS_OSCE=ON -DBUILD_SHARED_LIBS=OFF -DOPUS_BUILD_PROGRAMS=OFF -DOPUS_BUILD_TESTING=OFF -A x64
+          cmake --build radae_nopy\build\opus_msvc_build --config Release
+
+      - name: Build codec2 (FreeDV) via MSYS2 MinGW
+        shell: C:\msys64\usr\bin\bash.exe -l {0}
+        run: |
+          pacman -S --noconfirm --needed mingw-w64-x86_64-cmake mingw-w64-x86_64-gcc mingw-w64-x86_64-make mingw-w64-x86_64-tools-git
+          export PATH="/mingw64/bin:$PATH"
+          cd "$GITHUB_WORKSPACE"
+          git clone --depth 1 https://github.com/drowe67/codec2.git codec2
+          cd codec2
+          mkdir -p build_mingw && cd build_mingw
+          /mingw64/bin/cmake -G "MinGW Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DUNITTEST=OFF \
+            -DCMAKE_C_COMPILER=/mingw64/bin/gcc.exe \
+            -DCMAKE_MAKE_PROGRAM=/mingw64/bin/mingw32-make.exe \
+            ..
+          /mingw64/bin/mingw32-make -j$(nproc) codec2
+
+      - name: Install codec2 into vcpkg prefix
+        shell: pwsh
+        run: |
+          $vcpkg = "C:\vcpkg\installed\x64-windows"
+
+          # DLL for runtime
+          Copy-Item "codec2\build_mingw\src\libcodec2.dll" "$vcpkg\bin\" -Force
+
+          # Generate MSVC import lib from MinGW DLL
+          & C:\msys64\mingw64\bin\gendef.exe codec2\build_mingw\src\libcodec2.dll
+          lib /def:libcodec2.def /out:"$vcpkg\lib\codec2.lib" /machine:x64
+
+          # Headers
+          New-Item -ItemType Directory -Force -Path "$vcpkg\include\codec2" | Out-Null
+          $headers = @("codec2.h", "codec2_fdmdv.h", "codec2_fifo.h", "codec2_cohpsk.h",
+                       "codec2_fm.h", "codec2_ofdm.h", "freedv_api.h", "reliable_text.h",
+                       "comp.h", "modem_stats.h")
+          foreach ($h in $headers) { Copy-Item "codec2\src\$h" "$vcpkg\include\codec2\" -Force }
+          Copy-Item "codec2\build_mingw\codec2\version.h" "$vcpkg\include\codec2\" -Force
 
       - name: Build
         shell: cmd
@@ -438,8 +506,9 @@ jobs:
           $vcpkgBin = "C:\vcpkg\installed\x64-windows\bin"
           $out = "wfweb-release"
 
-          # vcpkg DLLs
-          foreach ($dll in @("portaudio.dll", "opus.dll", "hidapi.dll",
+          # vcpkg DLLs (opus is statically linked via RADE custom build)
+          foreach ($dll in @("portaudio.dll", "hidapi.dll",
+                             "libcodec2.dll",
                              "libssl-3-x64.dll", "libcrypto-3-x64.dll")) {
             $src = Join-Path $vcpkgBin $dll
             if (Test-Path $src) { Copy-Item $src $out -Force }

@@ -1747,6 +1747,8 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
                     qInfo() << "Web: FreeDV enabled, mode=" << modeName;
                 }
             }
+#elif defined(RADE_SUPPORT)
+            { }
 #endif
         } else {
             freedvEnabled = false;
