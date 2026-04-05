@@ -2246,37 +2246,37 @@ body.digi-open .digi-bar {
                 <span class="gain-label">AF</span>
                 <div class="gain-bar-bg"><div class="gain-bar-fill" id="afGainFill" style="width:50%"></div>
                     <input type="range" id="afGainSlider" min="0" max="255" value="128"></div>
-                <span class="gain-val" id="afGainVal">128</span>
+                <span class="gain-val" id="afGainVal">50%</span>
             </div>
             <div class="gain-row">
                 <span class="gain-label">RF</span>
                 <div class="gain-bar-bg"><div class="gain-bar-fill" id="rfGainFill" style="width:50%"></div>
                     <input type="range" id="rfGainSlider" min="0" max="255" value="128"></div>
-                <span class="gain-val" id="rfGainVal">128</span>
+                <span class="gain-val" id="rfGainVal">50%</span>
             </div>
             <div class="gain-row">
                 <span class="gain-label">PWR</span>
                 <div class="gain-bar-bg"><div class="gain-bar-fill" id="rfPowerFill" style="width:50%"></div>
                     <input type="range" id="rfPowerSlider" min="0" max="255" value="128"></div>
-                <span class="gain-val" id="rfPowerVal">128</span>
+                <span class="gain-val" id="rfPowerVal">50%</span>
             </div>
             <div class="gain-row">
                 <span class="gain-label">SQL</span>
                 <div class="gain-bar-bg"><div class="gain-bar-fill" id="squelchFill" style="width:0%"></div>
                     <input type="range" id="squelchSlider" min="0" max="255" value="0"></div>
-                <span class="gain-val" id="squelchVal">0</span>
+                <span class="gain-val" id="squelchVal">0%</span>
             </div>
             <div class="gain-row">
                 <span class="gain-label">USB MIC</span>
                 <div class="gain-bar-bg"><div class="gain-bar-fill" id="micGainFill" style="width:50%"></div>
                     <input type="range" id="micGainSlider" min="0" max="255" value="128"></div>
-                <span class="gain-val" id="micGainVal">128</span>
+                <span class="gain-val" id="micGainVal">50%</span>
             </div>
             <div class="gain-row">
                 <span class="gain-label">MON</span>
                 <div class="gain-bar-bg"><div class="gain-bar-fill" id="monitorLevelFill" style="width:50%"></div>
                     <input type="range" id="monitorLevelSlider" min="0" max="255" value="128"></div>
-                <span class="gain-val" id="monitorLevelVal">128</span>
+                <span class="gain-val" id="monitorLevelVal">50%</span>
             </div>
             <div class="gain-back-row">
                 <button class="ov-btn back-btn" onclick="setPanel('default')">&#x21A9;</button>
@@ -3080,7 +3080,7 @@ function initSliderTracking() {
         slider.addEventListener('input', function() {
             var val = slider.value;
             sliderSetTimes[name] = Date.now();
-            document.getElementById(name + 'Val').textContent = val;
+            document.getElementById(name + 'Val').textContent = toPercent(val, 255);
             var fill = document.getElementById(name.replace(/([A-Z])/g, function(m) { return m; }) + 'Fill');
             if (fill) fill.style.width = (val / 255 * 100) + '%';
             if (name === 'afGain') throttledSend('afGain', 'setAfGain', val);
@@ -3103,7 +3103,7 @@ function initSliderTracking() {
         slider.addEventListener('input', function() {
             var val = parseInt(slider.value);
             monitorLevel = val;
-            document.getElementById('monitorLevelVal').textContent = val;
+            document.getElementById('monitorLevelVal').textContent = toPercent(val, 255);
             document.getElementById('monitorLevelFill').style.width = (val / 255 * 100) + '%';
             throttledSend('monitorLevel', 'setMonitorGain', val);
             if (currentPanel === 'func') renderFuncOverlay();
@@ -3162,6 +3162,8 @@ function updatePBTFill(id, val) {
     }
 }
 
+function toPercent(val, max) { return Math.round(val / (max || 255) * 100) + '%'; }
+
 function updateSlider(name, val) {
     if (sliderDragging[name]) return;
     if ((Date.now() - (sliderSetTimes[name] || 0)) < SLIDER_DEBOUNCE_MS) return;
@@ -3190,7 +3192,7 @@ function updateSlider(name, val) {
         updatePBTFill('pbtOuterFill', val);
         return;
     }
-    if (valSpan) valSpan.textContent = val;
+    if (valSpan) valSpan.textContent = toPercent(val, parseInt((slider || {}).max) || 255);
     // Update fill bars
     var fillId = name + 'Fill';
     var fill = document.getElementById(fillId);
@@ -3758,7 +3760,7 @@ function renderFuncOverlay() {
     }));
 
     // Monitor (TX sidetone)
-    grid.appendChild(makeFuncBtn('MON', monitorEnabled ? monitorLevel : 'OFF', monitorEnabled, function() {
+    grid.appendChild(makeFuncBtn('MON', monitorEnabled ? toPercent(monitorLevel, 255) : 'OFF', monitorEnabled, function() {
         monitorEnabled = !monitorEnabled;
         send({ cmd: 'setMonitor', value: monitorEnabled });
         renderFuncOverlay();
