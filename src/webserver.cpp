@@ -2839,11 +2839,24 @@ void webServer::onFreeDVStats(float snr, bool sync)
         notify["freedvSync"] = sync;
         notify["freedvSNR"] = (double)snr;
         sendJsonToAll(notify);
+
+        if (freedvReporter) {
+            if (sync) {
+                // Sync acquired: send immediate report, start periodic updates
+                lastReportedCallsign.clear();
+                freedvReporter->updateRxSpot(QString(), freedvModeName, (int)snr);
+                startReporterSnrTimer();
+            } else {
+                // Sync lost: stop periodic updates
+                stopReporterSnrTimer();
+            }
+        }
     }
 }
 void webServer::onFreeDVRxCallsign(const QString &callsign)
 {
     qInfo() << "FreeDV: decoded callsign:" << callsign;
+    lastReportedCallsign = callsign;
     if (freedvReporter && freedvSync)
         freedvReporter->updateRxSpot(callsign, freedvModeName, (int)freedvSNR);
 }
@@ -2863,6 +2876,26 @@ void webServer::onReporterStateChanged(int state)
     notify["enabled"] = reporterEnabled;
     notify["state"] = stateStr;
     sendJsonToAll(notify);
+}
+
+void webServer::startReporterSnrTimer()
+{
+    if (!reporterSnrTimer) {
+        reporterSnrTimer = new QTimer(this);
+        reporterSnrTimer->setInterval(4000);
+        connect(reporterSnrTimer, &QTimer::timeout, this, [this]() {
+            if (freedvReporter && freedvSync)
+                freedvReporter->updateRxSpot(lastReportedCallsign, freedvModeName, (int)freedvSNR);
+        });
+    }
+    reporterSnrTimer->start();
+}
+
+void webServer::stopReporterSnrTimer()
+{
+    if (reporterSnrTimer)
+        reporterSnrTimer->stop();
+    lastReportedCallsign.clear();
 }
 #endif // FREEDV_SUPPORT
 
@@ -2959,9 +2992,17 @@ void webServer::onRadeStats(float snr, bool sync, float freqOffset)
         notify["freedvFreqOffset"] = (double)freqOffset;
         sendJsonToAll(notify);
 #ifdef FREEDV_SUPPORT
-        // Report RX mode to FreeDV Reporter when RADE acquires sync
-        if (freedvReporter && sync)
-            freedvReporter->updateRxSpot(QString(), freedvModeName, (int)snr);
+        if (freedvReporter) {
+            if (sync) {
+                // Sync acquired: send immediate report, start periodic updates
+                lastReportedCallsign.clear();
+                freedvReporter->updateRxSpot(QString(), freedvModeName, (int)snr);
+                startReporterSnrTimer();
+            } else {
+                // Sync lost: stop periodic updates
+                stopReporterSnrTimer();
+            }
+        }
 #endif
         // Callsign clearing is handled by a timer started in onRadeRxCallsign.
     }
@@ -2995,6 +3036,7 @@ void webServer::onRadeRxCallsign(const QString &callsign)
     // Report to FreeDV Reporter with the decoded callsign.
     // No sync check: the callsign arrives from the EOO frame which is
     // the last frame — sync is already lost by the time the callback fires.
+    lastReportedCallsign = callsign;
     if (freedvReporter) {
         qInfo() << "Web: reporting RX spot to FreeDV Reporter:" << callsign
                 << "mode=" << freedvModeName << "snr=" << (int)freedvSNR;

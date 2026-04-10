@@ -156,6 +156,8 @@ private:
     QJsonObject buildInfoJson() const;
     void sendJsonToAll(const QJsonObject &obj);
     void sendJsonTo(QWebSocket *client, const QJsonObject &obj);
+    void startReporterSnrTimer();
+    void stopReporterSnrTimer();
     void sendBinaryToAll(const QByteArray &data);
     void sendBinaryToAudioClients(const QByteArray &data);
     void handleCommand(QWebSocket *client, const QJsonObject &cmd);
@@ -254,6 +256,8 @@ private:
 #endif
     float freedvSNR = 0.0f;
     bool freedvSync = false;
+    QTimer *reporterSnrTimer = nullptr;    // periodic SNR updates to FreeDV Reporter
+    QString lastReportedCallsign;          // callsign to include in periodic reports
     QByteArray freedvTxBuffer;
     QTimer *freedvTxDrainTimer = nullptr;
     bool freedvTxActive = false;  // true once ALSA restarted for FreeDV TX
