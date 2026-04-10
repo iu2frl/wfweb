@@ -4272,6 +4272,8 @@ function toggleFreeDV() {
     if (freedvEnabled) {
         send({ cmd: 'setFreeDV', enabled: false });
     } else {
+        // Close DIGI panel if open — modes are mutually exclusive
+        if (digiBarVisible) toggleDigiBar();
         freedvModeName = freedvModes[0];
         freedvTxGain = 0.25;
         ALC_SMOOTHED = 0;
@@ -5696,6 +5698,8 @@ function toggleDigiBar() {
     digiBarVisible = !digiBarVisible;
     var bar = document.getElementById('digiBar');
     if (digiBarVisible) {
+        // Disable FreeDV if active — modes are mutually exclusive
+        if (freedvEnabled) send({ cmd: 'setFreeDV', enabled: false });
         bar.classList.remove('hidden');
         document.body.classList.add('digi-open');
         // FT8 requires USB — set it automatically on open
