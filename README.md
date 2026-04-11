@@ -157,6 +157,47 @@ All settings can be passed as CLI flags. Run `wfweb --help` for the full list.
 | `-c --clearconfig CONFIRM` | Reset all saved settings and exit | — |
 | `-d --debug` | Enable debug logging | off |
 
+### About `--settings`
+
+Most users never need this flag. wfweb normally stores **your** preferences
+(which serial port, which audio device, web-server port, LAN address and
+credentials, per-radio config, etc.) in the OS default location under your
+user profile. `--settings` just lets you point it somewhere else instead.
+
+The file is created and managed by wfweb — you don't hand-write it. You
+edit settings through the web UI and wfweb persists them to whichever file
+you named.
+
+**Common reasons to use `--settings`:**
+
+- **Running multiple wfweb instances in parallel, one per radio.** Give
+  each its own `--settings` file so they don't overwrite each other's
+  config.
+- **Docker or systemd deployments** where the default per-user location is
+  inconvenient. Mount or install a config at a fixed, predictable path
+  (e.g. `/etc/wfweb/station.ini`).
+- **Named profiles** you can switch between or back up: `home.ini`,
+  `contest.ini`, `portable.ini`, etc.
+
+To create a fresh settings file, just run:
+
+```bash
+wfweb -s ./my-profile.ini
+```
+
+wfweb writes a file with sensible defaults on first run. After that, open
+the web UI and configure as usual — your changes are saved back to that
+file.
+
+If all you need is to talk to a rig on a non-default CI-V address or a
+different manufacturer, you don't need `--settings` at all — use `--civ
+<addr>` and `--manufacturer <id>` directly.
+
+> **Note:** `--settings` does **not** take `.rig` files. Those are CI-V
+> command dictionaries for specific radio models that wfweb already loads
+> automatically from its install's `rigs/` directory based on the radio it
+> detects on the bus. You should never pass one on the command line.
+
 ---
 
 ## CI-V address table

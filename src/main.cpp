@@ -225,6 +225,54 @@ int main(int argc, char *argv[])
             {
                 settingsFile = argv[c + 1];
                 c += 1;
+                if (settingsFile.endsWith(".rig", Qt::CaseInsensitive))
+                {
+                    std::cout <<
+                        "Error: '" << settingsFile.toStdString() << "' is a radio\n"
+                        "definition file (.rig), not a wfweb settings file. --settings\n"
+                        "does not take .rig files.\n"
+                        "\n"
+                        ".rig files are CI-V command dictionaries for specific radio\n"
+                        "models. wfweb already loads them automatically from its install's\n"
+                        "rigs/ directory based on the radio it detects on the CI-V bus.\n"
+                        "You should never pass one on the command line.\n"
+                        "\n"
+                        "What --settings is actually for:\n"
+                        "\n"
+                        "wfweb normally stores YOUR preferences (which serial port, which\n"
+                        "audio device, web-server port, LAN address and credentials, per-\n"
+                        "radio config, etc.) in the OS default location under your user\n"
+                        "profile. --settings lets you point it somewhere else instead.\n"
+                        "The file itself is created and managed by wfweb — you don't\n"
+                        "hand-write it; you edit settings through the web UI and wfweb\n"
+                        "persists them to whichever file you named.\n"
+                        "\n"
+                        "Common reasons to use --settings:\n"
+                        "\n"
+                        "  * Running multiple wfweb instances in parallel, one per radio.\n"
+                        "    Give each its own --settings file so they don't overwrite\n"
+                        "    each other's config.\n"
+                        "\n"
+                        "  * Docker or systemd deployments where the default per-user\n"
+                        "    location is inconvenient. Mount or install a config at a\n"
+                        "    fixed, predictable path (e.g. /etc/wfweb/station.ini).\n"
+                        "\n"
+                        "  * Named profiles you can switch between or back up:\n"
+                        "    home.ini, contest.ini, portable.ini, etc.\n"
+                        "\n"
+                        "To create a fresh settings file, just run:\n"
+                        "\n"
+                        "    wfweb -s ./my-profile.ini\n"
+                        "\n"
+                        "wfweb writes a file with sensible defaults on first run. After\n"
+                        "that, open the web UI and configure as usual — your changes are\n"
+                        "saved back to that file.\n"
+                        "\n"
+                        "If all you need is to talk to a rig on a non-default CI-V address\n"
+                        "or a different manufacturer, you don't need --settings at all —\n"
+                        "use --civ <addr> and --manufacturer <id> directly.\n";
+                    return -1;
+                }
             }
         }
         else if ((currentArg == "-c") || (currentArg == "--clearconfig"))

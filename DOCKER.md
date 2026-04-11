@@ -207,6 +207,29 @@ docker run --rm -it \
   k1fm/wfweb -s /config/wfweb.conf
 ```
 
+A settings file is where wfweb persists **your** preferences — serial
+port, audio device, web port, LAN address and credentials, per-radio
+config, and so on. You don't hand-write it; wfweb creates it on first
+run with sensible defaults and then saves your changes back to it from
+the web UI. Mounting one into the container is how you give a Docker
+deployment a fixed, predictable config location instead of relying on
+the default per-user path inside the container (which vanishes when the
+container exits).
+
+If you're running **multiple wfweb containers in parallel** (one per
+radio), give each its own mounted settings file so they don't overwrite
+each other's state. For **named profiles** you want to switch between
+(`home.conf`, `contest.conf`, ...), just mount a different file.
+
+If all you need is to talk to a rig on a non-default CI-V address or a
+different manufacturer, you don't need `-s` at all — use `--civ <addr>`
+and `--manufacturer <id>` directly.
+
+> **Note:** `-s` does **not** take `.rig` files. Those are CI-V command
+> dictionaries for specific radio models that wfweb already loads
+> automatically from its install's `rigs/` directory based on the radio
+> it detects on the bus.
+
 The TLS certificate is stored in `/root/.local/share/wfview/wfweb/`. Mount that
 path too if you want to persist or supply your own certificate.
 
@@ -240,7 +263,9 @@ Audio:
   --audio-system <id>     Audio backend (0=Qt, 1=PortAudio, 2=RtAudio)
 
 General:
-  -s --settings <file>    Settings file path
+  -s --settings <file>    Path to a wfweb settings file (see "pre-made
+                          settings file" above). Does NOT accept .rig
+                          files. Most users don't need this flag.
   -l --logfile <file>     Log file path
   -b --background         Run as daemon
   -d --debug              Enable debug logging
