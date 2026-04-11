@@ -12,65 +12,6 @@ wfweb turns your transceiver into a web-accessible station. Waterfall, SSB, CW d
 
 ---
 
-## IC-7300 Mk2 with Ethernet? Just run Docker
-
-The IC-7300 Mk2 has a built-in Ethernet port. No USB cable, no drivers, no build — just pull and run:
-
-```bash
-docker run --rm -it \
-  -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb --lan 192.168.1.100 --civ 130 --lan-user admin --lan-pass secret
-```
-
-Replace the IP, username, and password with your radio's settings. Open `https://<host>:8080` in your browser, accept the self-signed certificate warning, and you're on the air.
-
-The Docker image is multi-arch (`linux/amd64` and `linux/arm64`) — it runs on x86 servers, Raspberry Pi, and everything in between.
-
----
-
-## USB connection? Grab a build
-
-For radios connected via USB, download a pre-built binary from [GitHub Releases](../../releases) for your platform:
-
-| Platform | Package | Distro |
-|---|---|---|
-| **Linux x86_64** | `.deb` (ubuntu2404) | Ubuntu 24.04 Noble |
-| **Linux x86_64** | `.deb` (debian12) | Debian 12 Bookworm |
-| **Linux x86_64** | `.deb` (debian13) | Debian 13 Trixie |
-| **Linux ARM64 / Raspberry Pi** | `.deb` (ubuntu2404) | Ubuntu 24.04 Noble |
-| **Linux ARM64 / Raspberry Pi** | `.deb` (debian12) | Raspberry Pi OS Bookworm / Debian 12 |
-| **Linux ARM64 / Raspberry Pi** | `.deb` (debian13) | Raspberry Pi OS Trixie / Debian 13 |
-| **macOS** | zip | Apple Silicon |
-| **Windows** | zip | x86_64 |
-
-> **Which `.deb` do I need?** The tag in the filename tells you:
-> **ubuntu2404** for Ubuntu 24.04,
-> **debian12** for Debian 12 Bookworm and Raspberry Pi OS Bookworm,
-> **debian13** for Debian 13 Trixie and Raspberry Pi OS Trixie.
-> Each is built natively on its target distro so the library dependencies match.
-
-Plug in your radio and run:
-
-```bash
-# IC-7300 — zero config, auto-detected
-./wfweb
-
-# IC-7300 Mk2
-./wfweb --civ 130
-
-# IC-7610
-./wfweb --civ 152
-
-# IC-705
-./wfweb --civ 164
-```
-
-Open `https://<host>:8080` in your browser. Accept the self-signed certificate warning. That's it.
-
-> For LAN connections from a native build, add `--lan <ip>` and credentials — see [Command-line options](#command-line-options) below.
-
----
-
 ## What wfweb adds over wfview
 
 wfweb is a fork of [wfview](https://gitlab.com/eliggett/wfview), the outstanding open-source front-end for Icom, Kenwood, and Yaesu transceivers by Elliott H. Liggett W6EL, Phil E. Taylor M0VSE, and contributors.
@@ -89,10 +30,95 @@ Everything wfview does, wfweb does too — plus a built-in web interface:
 | Browser TX audio (mic to rig) | — | ✓ |
 | CW decoder (ggmorse / Goertzel) | — | ✓ |
 | FT8/FT4 DIGI panel (full QSO) | — | ✓ |
-| FreeDV digital voice (700D/700E) | — | ✓ |
 | RADE (Radio Autoencoder) | — | ✓ |
+| FreeDV digital voice (700D/700E/1600) | — | ✓ |
 | Mobile-responsive UI | — | ✓ |
 | Headless / no-display operation | — | ✓ |
+
+---
+
+## Getting started
+
+There are three ways to run wfweb. Pick the one that matches your setup:
+
+1. [**Native build, USB radio**](#1-native-build--usb-radio) — any supported Icom connected by USB cable (most common)
+2. [**Native build, LAN radio**](#2-native-build--lan-radio) — radios with built-in Ethernet (e.g. IC-7300 Mk2, IC-9700) or a LAN accessory
+3. [**Docker**](#3-docker) — zero-install, multi-arch image for either USB or LAN radios
+
+In every case, once wfweb is running you open `https://<host>:8080` in your browser and accept the self-signed certificate warning.
+
+### 1. Native build — USB radio
+
+Download a pre-built binary from [GitHub Releases](../../releases) for your platform, plug in your radio, and run:
+
+```bash
+./wfweb
+```
+
+That's it — any supported Icom (IC-7300, IC-7300 Mk2, IC-7610, IC-705, IC-9700, IC-7100, IC-7410) is auto-detected over USB at its default CI-V address.
+
+If you've changed your radio's CI-V address to something non-standard, pass it explicitly:
+
+```bash
+./wfweb --civ 148   # decimal, see CI-V address table below
+```
+
+### 2. Native build — LAN radio
+
+For Icoms with a built-in Ethernet port (IC-7300 Mk2, IC-9700, IC-7610, …) or a LAN accessory, specify the IP, CI-V address, and credentials on the command line:
+
+```bash
+./wfweb --lan 192.168.1.100 --civ 130 --lan-user admin --lan-pass secret
+```
+
+Replace the IP and credentials with your radio's settings. `--civ` is required on LAN (there is no serial bus to probe for auto-detect).
+
+### 3. Docker
+
+No build, no dependencies. The image `k1fm/wfweb` is multi-arch (`linux/amd64` and `linux/arm64`) — it runs on x86 servers, Raspberry Pi, and everything in between.
+
+**LAN radio (e.g. IC-7300 Mk2 via Ethernet):**
+
+```bash
+docker run --rm -it \
+  -p 8080:8080 -p 8081:8081 \
+  k1fm/wfweb --lan 192.168.1.100 --civ 130 --lan-user admin --lan-pass secret
+```
+
+**USB radio** (share the serial device and sound subsystem with the container):
+
+```bash
+docker run --rm -it \
+  --device /dev/ttyUSB0 \
+  --device /dev/snd --group-add audio \
+  -p 8080:8080 -p 8081:8081 \
+  k1fm/wfweb
+```
+
+See [Docker details](#docker-details) below for USB audio, custom serial ports, and building the image locally.
+
+---
+
+## Downloads
+
+Pre-built binaries are published on [GitHub Releases](../../releases):
+
+| Platform | Package | Distro |
+|---|---|---|
+| **Linux x86_64** | `.deb` (ubuntu2404) | Ubuntu 24.04 Noble |
+| **Linux x86_64** | `.deb` (debian12) | Debian 12 Bookworm |
+| **Linux x86_64** | `.deb` (debian13) | Debian 13 Trixie |
+| **Linux ARM64 / Raspberry Pi** | `.deb` (ubuntu2404) | Ubuntu 24.04 Noble |
+| **Linux ARM64 / Raspberry Pi** | `.deb` (debian12) | Raspberry Pi OS Bookworm / Debian 12 |
+| **Linux ARM64 / Raspberry Pi** | `.deb` (debian13) | Raspberry Pi OS Trixie / Debian 13 |
+| **macOS** | zip | Apple Silicon |
+| **Windows** | zip | x86_64 |
+
+> **Which `.deb` do I need?** The tag in the filename tells you:
+> **ubuntu2404** for Ubuntu 24.04,
+> **debian12** for Debian 12 Bookworm and Raspberry Pi OS Bookworm,
+> **debian13** for Debian 13 Trixie and Raspberry Pi OS Trixie.
+> Each is built natively on its target distro so the library dependencies match.
 
 ---
 
@@ -106,9 +132,10 @@ All FreeDV processing happens **server-side**: the server encodes and decodes mo
 
 | Mode | Type | Description |
 |------|------|-------------|
+| **RADE** | Radio Autoencoder | Next-generation ML-based codec using neural network inference for high-quality low-bitrate voice over HF |
 | **700D** | Classic FreeDV | Proven HF digital voice, OFDM modem, works well on noisy channels |
 | **700E** | Classic FreeDV | Improved 700D variant with better performance on fast-fading channels |
-| **RADE** | Radio Autoencoder | Next-generation ML-based codec using neural network inference for high-quality low-bitrate voice over HF |
+| **1600** | Classic FreeDV | Original FreeDV mode, FDM modem, robust on clean channels |
 
 ### How it works
 
@@ -119,19 +146,9 @@ TX:  Browser (speech) → FreeDV/RADE encode → modem tones → radio (SSB)
 
 Select the FreeDV mode from the web UI, key up, and talk — wfweb handles the rest.
 
-### Platform support
-
-| Platform | FreeDV 700D/700E | RADE |
-|----------|:---:|:---:|
-| Linux x86_64 | ✓ | ✓ |
-| Linux ARM64 / Raspberry Pi | ✓ | ✓ |
-| macOS (Apple Silicon) | ✓ | ✓ |
-| Docker | ✓ | ✓ |
-| Windows x86_64 | ✓ | ✓ |
-
 ### Performance
 
-RADE uses real-time neural network inference. Expect roughly **40% CPU usage** on a mid-range laptop (e.g. Intel i5-10310U @ 1.70 GHz). The classic FreeDV modes (700D/700E) are much lighter and run comfortably on a Raspberry Pi.
+RADE uses real-time neural network inference. Expect roughly **40% CPU usage** on a mid-range laptop (e.g. Intel i5-10310U @ 1.70 GHz). The classic FreeDV modes (700D/700E/1600) are much lighter and run comfortably on a Raspberry Pi.
 
 ---
 
@@ -150,7 +167,7 @@ All settings can be passed as CLI flags. Run `wfweb --help` for the full list.
 | `--lan-audio <port>` | LAN audio port | `50003` |
 | `--lan-user <user>` | LAN username | (empty) |
 | `--lan-pass <pass>` | LAN password | (empty) |
-| `--civ <addr>` | CI-V address (decimal) | auto-detect |
+| `--civ <addr>` | CI-V address (decimal) | auto-detect (USB only) |
 | `--manufacturer <id>` | 0=Icom, 1=Kenwood, 2=Yaesu | `0` (Icom) |
 | `-l --logfile <file>` | Log to file | `/tmp/wfweb-*.log` |
 | `-b --background` | Run as daemon (Linux/macOS) | foreground |
@@ -159,25 +176,15 @@ All settings can be passed as CLI flags. Run `wfweb --help` for the full list.
 
 ### About `--settings`
 
-Most users never need this flag. wfweb normally stores **your** preferences
-(which serial port, which audio device, web-server port, LAN address and
-credentials, per-radio config, etc.) in the OS default location under your
-user profile. `--settings` just lets you point it somewhere else instead.
+Most users never need this flag. wfweb normally stores **your** preferences (serial port, audio device, web-server port, LAN address and credentials, per-radio config, etc.) in the OS default location under your user profile. `--settings` just lets you point it somewhere else instead.
 
-The file is created and managed by wfweb — you don't hand-write it. You
-edit settings through the web UI and wfweb persists them to whichever file
-you named.
+The file is created and managed by wfweb — you don't hand-write it. You edit settings through the web UI and wfweb persists them to whichever file you named.
 
 **Common reasons to use `--settings`:**
 
-- **Running multiple wfweb instances in parallel, one per radio.** Give
-  each its own `--settings` file so they don't overwrite each other's
-  config.
-- **Docker or systemd deployments** where the default per-user location is
-  inconvenient. Mount or install a config at a fixed, predictable path
-  (e.g. `/etc/wfweb/station.ini`).
-- **Named profiles** you can switch between or back up: `home.ini`,
-  `contest.ini`, `portable.ini`, etc.
+- **Running multiple wfweb instances in parallel, one per radio.** Give each its own `--settings` file so they don't overwrite each other's config.
+- **Docker or systemd deployments** where the default per-user location is inconvenient. Mount or install a config at a fixed, predictable path (e.g. `/etc/wfweb/station.ini`).
+- **Named profiles** you can switch between or back up: `home.ini`, `contest.ini`, `portable.ini`, etc.
 
 To create a fresh settings file, just run:
 
@@ -185,18 +192,11 @@ To create a fresh settings file, just run:
 wfweb -s ./my-profile.ini
 ```
 
-wfweb writes a file with sensible defaults on first run. After that, open
-the web UI and configure as usual — your changes are saved back to that
-file.
+wfweb writes a file with sensible defaults on first run. After that, open the web UI and configure as usual — your changes are saved back to that file.
 
-If all you need is to talk to a rig on a non-default CI-V address or a
-different manufacturer, you don't need `--settings` at all — use `--civ
-<addr>` and `--manufacturer <id>` directly.
+If all you need is to talk to a rig on a non-default CI-V address or a different manufacturer, you don't need `--settings` at all — use `--civ <addr>` and `--manufacturer <id>` directly.
 
-> **Note:** `--settings` does **not** take `.rig` files. Those are CI-V
-> command dictionaries for specific radio models that wfweb already loads
-> automatically from its install's `rigs/` directory based on the radio it
-> detects on the bus. You should never pass one on the command line.
+> **Note:** `--settings` does **not** take `.rig` files. Those are CI-V command dictionaries for specific radio models that wfweb already loads automatically from its install's `rigs/` directory based on the radio it detects on the bus. You should never pass one on the command line.
 
 ---
 
@@ -206,7 +206,7 @@ Default CI-V addresses for supported radios (decimal values for `--civ`):
 
 | Radio | CI-V (hex) | CI-V (decimal) |
 |---|:---:|:---:|
-| IC-7300 | 0x94 | 148 (auto-detected) |
+| IC-7300 | 0x94 | 148 |
 | IC-7300 Mk2 | 0x82 | 130 |
 | IC-705 | 0xA4 | 164 |
 | IC-7610 | 0x98 | 152 |
@@ -214,20 +214,15 @@ Default CI-V addresses for supported radios (decimal values for `--civ`):
 | IC-7100 | 0x88 | 136 |
 | IC-7410 | 0x80 | 128 |
 
+On USB, these are auto-detected; you only need `--civ` if the radio was reconfigured to a non-standard address. On LAN, `--civ` is required.
+
 ---
 
 ## Docker details
 
-### USB-connected radios
+The [Getting started](#3-docker) section covers the common cases. These are extras.
 
-```bash
-docker run --rm -it \
-  --device /dev/ttyUSB0 \
-  -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb
-```
-
-Pass CLI flags after the image name (e.g. `--civ 130`). For a different serial port:
+### Custom serial port
 
 ```bash
 docker run --rm -it \
@@ -236,20 +231,9 @@ docker run --rm -it \
   k1fm/wfweb --serial-port /dev/ttyUSB1
 ```
 
-### USB audio (TX/RX through the radio's USB audio codec)
+### IC-7300 (original) via USB on Linux with radio USB audio
 
-```bash
-docker run --rm -it \
-  --device /dev/ttyUSB0 \
-  --device /dev/snd \
-  --group-add audio \
-  -p 8080:8080 -p 8081:8081 \
-  k1fm/wfweb
-```
-
-### IC-7300 (original) via USB on Linux
-
-The original IC-7300 connects via USB, which provides both a serial port and a USB audio codec. Pass the serial device, the sound subsystem, and the `--audio-device` flag to route TX/RX audio through the radio:
+The original IC-7300 connects via USB, which provides both a serial port and a USB audio codec. To route TX/RX audio through the radio, pass the serial device, the sound subsystem, and the `--audio-device` flag:
 
 ```bash
 docker run --rm -it \
