@@ -6,6 +6,32 @@ a built-in web interface. See https://gitlab.com/eliggett/wfview for the
 upstream wfview history.
 
 
+v0.5.1 (2026-04-11)
+--------------------
+
+Features:
+- Add FreeDV Reporter integration (qso.freedv.org Socket.IO client) and
+  RADE EOO callsign encoding/decoding
+- Send continuous SNR updates to FreeDV Reporter while receiving
+- Add monitor (MON) control via CI-V commands
+- Add sidetone to DIGI TUNE and use same gain as regular TX
+- Show percentages instead of raw values on gain sliders
+- Accept hex CI-V addresses on --civ and drop the built-in address table
+
+Fixes:
+- Fix VFO/split commands on cmd29 rigs (IC-7610, IC-785x, IC-9700, IC-905)
+- Fix RADE TX power drift caused by shared ALC-controlled gain
+- Fix setCIVAddr signal/slot type mismatch
+- Send freedvModes independently of rigCaps to fix LAN race
+- Disable FreeDV on non-voice modes and force SSB when enabled
+- Make FreeDV and FT8/DIGI modes mutually exclusive
+- Reject .rig files passed to --settings with a helpful error
+
+Documentation:
+- Reorganize README with a Getting Started section
+- Drop --civ from LAN examples in README and DOCKER docs
+
+
 v0.5.0 (2026-04-05)
 --------------------
 
