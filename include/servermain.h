@@ -69,7 +69,7 @@ public:
 
 signals:
     // Basic to rig:
-    void setCIVAddr(unsigned char newRigCIVAddr);
+    void setCIVAddr(quint16 newRigCIVAddr);
     void setRigID(unsigned char rigID);
     void setPTTType(pttType_t ptt);
 

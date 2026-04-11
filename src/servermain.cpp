@@ -231,7 +231,7 @@ void servermain::makeRig()
             connect(this, SIGNAL(sendChangeLatency(quint16)), radio->rig, SLOT(changeLatency(quint16)));
             connect(radio->rig, SIGNAL(commReady()), this, SLOT(receiveCommReady()));
 
-            connect(this, SIGNAL(setCIVAddr(unsigned char)), radio->rig, SLOT(setCIVAddr(unsigned char)));
+            connect(this, SIGNAL(setCIVAddr(quint16)), radio->rig, SLOT(setCIVAddr(quint16)));
             connect(this, SIGNAL(sendPowerOn()), radio->rig, SLOT(powerOn()));
             connect(this, SIGNAL(sendPowerOff()), radio->rig, SLOT(powerOff()));
 
