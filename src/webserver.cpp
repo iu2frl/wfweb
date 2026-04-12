@@ -364,6 +364,7 @@ void webServer::receiveRigCaps(rigCapabilities *caps)
         obj["hasSpectrum"] = rigCaps->hasSpectrum;
         obj["spectLenMax"] = rigCaps->spectLenMax;
         obj["spectAmpMax"] = rigCaps->spectAmpMax;
+        obj["hasMainSub"] = rigCaps->hasCommand29;
 
         QJsonArray modes;
         for (const modeInfo &mi : rigCaps->modes) {
@@ -676,8 +677,10 @@ void webServer::handleRestRequest(QTcpSocket *socket, const QString &method,
                 QJsonObject e; e["error"] = "Rig not connected";
                 sendRestResponse(socket, 503, e); return;
             }
-            vfoCommandType t = queue->getVfoCommand(vfoA, 0, false);
-            cacheItem freqCache = queue->getCache(t.freqFunc, 0);
+            bool cmd29 = rigCaps && rigCaps->hasCommand29;
+            uchar rx = cmd29 ? (queue->getState().vfo == vfoSub ? 1 : 0) : 0;
+            vfoCommandType t = queue->getVfoCommand(vfoA, rx, false);
+            cacheItem freqCache = queue->getCache(t.freqFunc, t.receiver);
             QJsonObject resp;
             if (freqCache.value.isValid()) {
                 freqt f = freqCache.value.value<freqt>();
@@ -704,8 +707,10 @@ void webServer::handleRestRequest(QTcpSocket *socket, const QString &method,
             f.Hz = hz;
             f.MHzDouble = hz / 1.0E6;
             f.VFO = activeVFO;
-            vfoCommandType t = queue->getVfoCommand(vfoA, 0, true);
-            queue->addUnique(priorityImmediate, queueItem(t.freqFunc, QVariant::fromValue<freqt>(f), false, 0));
+            bool cmd29 = rigCaps && rigCaps->hasCommand29;
+            uchar rx = cmd29 ? (queue->getState().vfo == vfoSub ? 1 : 0) : 0;
+            vfoCommandType t = queue->getVfoCommand(vfoA, rx, true);
+            queue->addUnique(priorityImmediate, queueItem(t.freqFunc, QVariant::fromValue<freqt>(f), false, t.receiver));
             QJsonObject resp; resp["status"] = "accepted";
             sendRestResponse(socket, 202, resp);
         } else {
@@ -722,8 +727,10 @@ void webServer::handleRestRequest(QTcpSocket *socket, const QString &method,
                 QJsonObject e; e["error"] = "Rig not connected";
                 sendRestResponse(socket, 503, e); return;
             }
-            vfoCommandType t = queue->getVfoCommand(vfoA, 0, false);
-            cacheItem modeCache = queue->getCache(t.modeFunc, 0);
+            bool cmd29 = rigCaps && rigCaps->hasCommand29;
+            uchar rx = cmd29 ? (queue->getState().vfo == vfoSub ? 1 : 0) : 0;
+            vfoCommandType t = queue->getVfoCommand(vfoA, rx, false);
+            cacheItem modeCache = queue->getCache(t.modeFunc, t.receiver);
             QJsonObject resp;
             if (modeCache.value.isValid()) {
                 modeInfo m = modeCache.value.value<modeInfo>();
@@ -750,8 +757,10 @@ void webServer::handleRestRequest(QTcpSocket *socket, const QString &method,
                 int filt = obj["filter"].toInt();
                 if (filt >= 1 && filt <= 3) m.filter = filt;
             }
-            vfoCommandType t = queue->getVfoCommand(vfoA, 0, true);
-            queue->addUnique(priorityImmediate, queueItem(t.modeFunc, QVariant::fromValue<modeInfo>(m), false, 0));
+            bool cmd29 = rigCaps && rigCaps->hasCommand29;
+            uchar rx = cmd29 ? (queue->getState().vfo == vfoSub ? 1 : 0) : 0;
+            vfoCommandType t = queue->getVfoCommand(vfoA, rx, true);
+            queue->addUnique(priorityImmediate, queueItem(t.modeFunc, QVariant::fromValue<modeInfo>(m), false, t.receiver));
             QJsonObject resp; resp["status"] = "accepted";
             sendRestResponse(socket, 202, resp);
         } else {
@@ -772,8 +781,9 @@ void webServer::handleRestRequest(QTcpSocket *socket, const QString &method,
             vfoCommandType tA = queue->getVfoCommand(vfoA, 0, false);
             cacheItem freqA = queue->getCache(tA.freqFunc, 0);
             if (freqA.value.isValid()) resp["vfoA"] = (qint64)freqA.value.value<freqt>().Hz;
-            vfoCommandType tB = queue->getVfoCommand(vfoB, 0, false);
-            cacheItem freqB = queue->getCache(tB.freqFunc, 0);
+            bool cmd29 = rigCaps && rigCaps->hasCommand29;
+            vfoCommandType tB = queue->getVfoCommand(vfoB, cmd29 ? 1 : 0, false);
+            cacheItem freqB = queue->getCache(tB.freqFunc, cmd29 ? 1 : 0);
             if (freqB.value.isValid()) resp["vfoB"] = (qint64)freqB.value.value<freqt>().Hz;
             sendRestResponse(socket, 200, resp);
         } else if (method == "PUT") {
@@ -785,12 +795,28 @@ void webServer::handleRestRequest(QTcpSocket *socket, const QString &method,
             if (obj.contains("action")) {
                 QString action = obj["action"].toString();
                 if (action == "swap") {
-                    queue->add(priorityImmediate, funcVFOSwapAB, false, false);
+                    funcs swapFunc = funcNone;
+                    if (rigCaps) {
+                        if (rigCaps->commands.contains(funcVFOSwapAB))
+                            swapFunc = funcVFOSwapAB;
+                        else if (rigCaps->commands.contains(funcVFOSwapMS))
+                            swapFunc = funcVFOSwapMS;
+                    }
+                    if (swapFunc != funcNone)
+                        queue->add(priorityImmediate, swapFunc, false, 0);
                     requestVfoUpdate();
                     QJsonObject resp; resp["status"] = "accepted";
                     sendRestResponse(socket, 202, resp);
                 } else if (action == "equalize") {
-                    queue->add(priorityImmediate, funcVFOEqualAB, false, false);
+                    funcs eqFunc = funcNone;
+                    if (rigCaps) {
+                        if (rigCaps->commands.contains(funcVFOEqualAB))
+                            eqFunc = funcVFOEqualAB;
+                        else if (rigCaps->commands.contains(funcVFOEqualMS))
+                            eqFunc = funcVFOEqualMS;
+                    }
+                    if (eqFunc != funcNone)
+                        queue->add(priorityImmediate, eqFunc, false, 0);
                     requestVfoUpdate();
                     QJsonObject resp; resp["status"] = "accepted";
                     sendRestResponse(socket, 202, resp);
@@ -800,7 +826,12 @@ void webServer::handleRestRequest(QTcpSocket *socket, const QString &method,
                 }
             } else if (obj.contains("active")) {
                 QString vfoName = obj["active"].toString();
-                vfo_t v = (vfoName == "B") ? vfoB : vfoA;
+                bool wantB = (vfoName == "B");
+                vfo_t v;
+                if (rigCaps && rigCaps->hasCommand29)
+                    v = wantB ? vfoSub : vfoMain;
+                else
+                    v = wantB ? vfoB : vfoA;
                 queue->addUnique(priorityImmediate, queueItem(funcSelectVFO, QVariant::fromValue<vfo_t>(v), false));
                 requestVfoUpdate();
                 QJsonObject resp; resp["status"] = "accepted";
@@ -1136,19 +1167,21 @@ void webServer::handleRestRequest(QTcpSocket *socket, const QString &method,
         }
         const memoryType &mem = it.value();
         // Set frequency
-        vfoCommandType tA = queue->getVfoCommand(vfoA, 0, true);
+        bool cmd29 = rigCaps && rigCaps->hasCommand29;
+        uchar rx = cmd29 ? (queue->getState().vfo == vfoSub ? 1 : 0) : 0;
+        vfoCommandType t = queue->getVfoCommand(vfoA, rx, true);
         freqt f;
         f.Hz = mem.frequency.Hz;
         f.MHzDouble = mem.frequency.Hz / 1.0E6;
         f.VFO = activeVFO;
-        queue->addUnique(priorityImmediate, queueItem(tA.freqFunc, QVariant::fromValue<freqt>(f), false, 0));
+        queue->addUnique(priorityImmediate, queueItem(t.freqFunc, QVariant::fromValue<freqt>(f), false, t.receiver));
         // Set mode
         for (const modeInfo &mi : rigCaps->modes) {
             if (mi.reg == mem.mode) {
                 modeInfo m = mi;
                 m.filter = mem.filter > 0 ? mem.filter : 1;
                 m.data = 0;
-                queue->addUnique(priorityImmediate, queueItem(tA.modeFunc, QVariant::fromValue<modeInfo>(m), false, 0));
+                queue->addUnique(priorityImmediate, queueItem(t.modeFunc, QVariant::fromValue<modeInfo>(m), false, t.receiver));
                 break;
             }
         }
@@ -1399,24 +1432,28 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
             f.Hz = hz;
             f.MHzDouble = hz / 1.0E6;
             f.VFO = activeVFO;
-            vfoCommandType t = queue->getVfoCommand(vfoA, 0, true);
-            queue->addUnique(priorityImmediate, queueItem(t.freqFunc, QVariant::fromValue<freqt>(f), false, 0));
+            bool cmd29 = rigCaps && rigCaps->hasCommand29;
+            uchar rx = cmd29 ? (queue->getState().vfo == vfoSub ? 1 : 0) : 0;
+            vfoCommandType t = queue->getVfoCommand(vfoA, rx, true);
+            queue->addUnique(priorityImmediate, queueItem(t.freqFunc, QVariant::fromValue<freqt>(f), false, t.receiver));
         }
     }
     else if (type == "setMode") {
         QString modeName = cmd["value"].toString();
         modeInfo m = stringToMode(modeName);
         if (m.mk != modeUnknown) {
-            vfoCommandType t = queue->getVfoCommand(vfoA, 0, true);
+            bool cmd29 = rigCaps && rigCaps->hasCommand29;
+            uchar rx = cmd29 ? (queue->getState().vfo == vfoSub ? 1 : 0) : 0;
+            vfoCommandType t = queue->getVfoCommand(vfoA, rx, true);
             // Preserve the current filter from cache instead of resetting to FIL1
-            cacheItem modeCache = queue->getCache(t.modeFunc, 0);
+            cacheItem modeCache = queue->getCache(t.modeFunc, t.receiver);
             if (modeCache.value.isValid()) {
                 modeInfo cached = modeCache.value.value<modeInfo>();
                 m.filter = cached.filter;
             }
             qCDebug(logWebServer) << "setMode:" << modeName << "mk=" << m.mk << "reg=" << m.reg
                                   << "name=" << m.name << "filter=" << m.filter << "func=" << t.modeFunc;
-            queue->addUnique(priorityImmediate, queueItem(t.modeFunc, QVariant::fromValue<modeInfo>(m), false, 0));
+            queue->addUnique(priorityImmediate, queueItem(t.modeFunc, QVariant::fromValue<modeInfo>(m), false, t.receiver));
         } else {
             qCWarning(logWebServer) << "setMode: unknown mode name:" << modeName;
         }
@@ -2062,6 +2099,7 @@ QJsonObject webServer::buildInfoJson() const
         info["txAudioAvailable"] = txAudioConfigured;
         info["hasFilterSettings"] = rigCaps->commands.contains(funcPBTInner);
         info["hasPowerControl"] = rigCaps->commands.contains(funcPowerControl);
+        info["hasMainSub"] = rigCaps->hasCommand29;
         if (!rigCaps->scopeCenterSpans.empty()) {
             QJsonArray spans;
             for (const centerSpanData &s : rigCaps->scopeCenterSpans) {

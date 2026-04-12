@@ -2487,6 +2487,7 @@ var availableModes = defaultModes.slice();
 var availablePreamps = [];
 var availableFilters = [];
 var currentVfo = 'A';
+var hasMainSub = false;
 
 // Meter state
 var meterVal = -54;
@@ -2656,6 +2657,7 @@ function handleMessage(msg) {
                 if (msg.preamps) populatePreamps(msg.preamps);
                 if (msg.filters) populateFilters(msg.filters);
                 if (msg.hasFilterSettings !== undefined) updateHasFilterSettings(msg.hasFilterSettings);
+                if (msg.hasMainSub !== undefined) { hasMainSub = msg.hasMainSub; updateVfoDisplay(); }
 
                 updateWarningVisibility();
             } else {
@@ -2674,6 +2676,7 @@ function handleMessage(msg) {
             if (msg.preamps) populatePreamps(msg.preamps);
             if (msg.filters) populateFilters(msg.filters);
             if (msg.hasFilterSettings !== undefined) updateHasFilterSettings(msg.hasFilterSettings);
+            if (msg.hasMainSub !== undefined) { hasMainSub = msg.hasMainSub; updateVfoDisplay(); }
             if (msg.hasPowerControl) document.getElementById('powerBtn').style.display = 'flex';
             if (msg.freedvModes) freedvModes = msg.freedvModes;
             updateWarningVisibility();
@@ -4196,7 +4199,11 @@ function setMode(mode) {
 function updateVfoDisplay() {
     var label = document.getElementById('vfoLabel');
     var num = document.getElementById('vfoNum');
-    label.textContent = 'VFO ' + currentVfo;
+    if (hasMainSub) {
+        label.textContent = 'VFO ' + (currentVfo === 'A' ? 'MAIN' : 'SUB');
+    } else {
+        label.textContent = 'VFO ' + currentVfo;
+    }
     num.style.display = 'none';
 }
 
