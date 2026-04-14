@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import signal
 import subprocess
 import sys
 import time
@@ -20,6 +19,7 @@ import pytest
 import requests
 
 from mock_radio import MockIcomRadio
+from mock_serial_radio import SerialMockRadio
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -213,3 +213,131 @@ def rest_url(wfweb_instance):
     """Base REST API URL: http://127.0.0.1:<port>/api/v1/radio"""
     _, web_port = wfweb_instance
     return f"http://127.0.0.1:{web_port + 1}/api/v1/radio"
+
+
+@pytest.fixture(scope="session")
+def poll(rest_url):
+    """Return a function that polls a REST endpoint until a condition is met.
+
+    Usage::
+        data = poll("frequency", lambda d: d.get("hz") == 7074000)
+    """
+    def _poll(endpoint, predicate, timeout=5.0):
+        url = f"{rest_url}/{endpoint}"
+        deadline = time.monotonic() + timeout
+        last_data = None
+        while time.monotonic() < deadline:
+            try:
+                r = requests.get(url, timeout=2)
+                if r.status_code == 200:
+                    last_data = r.json() if r.text else {}
+                    if predicate(last_data):
+                        return last_data
+            except (requests.ConnectionError, requests.JSONDecodeError):
+                pass
+            time.sleep(0.2)
+        pytest.fail(f"poll({endpoint}) timed out. Last: {last_data}")
+    return _poll
+
+
+# ---------------------------------------------------------------------------
+# USB/serial mock fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def serial_mock():
+    """Start a SerialMockRadio (PTY-based) for the entire test session."""
+    server = SerialMockRadio()
+    server.start()
+    yield server
+    server.stop()
+
+
+@pytest.fixture(scope="session")
+def usb_wfweb_instance(serial_mock):
+    """Start wfweb connected to serial_mock via PTY, yield (process, web_port)."""
+    if not WFWEB_BIN.exists():
+        pytest.skip(f"wfweb binary not found at {WFWEB_BIN}")
+
+    web_port = _find_free_port()
+    rest_port = web_port + 1
+
+    cmd = [
+        str(WFWEB_BIN),
+        "-p", str(web_port),
+        "--serial-port", serial_mock.port_path,
+        "--civ", "0x98",
+    ]
+
+    env = os.environ.copy()
+    env["HOME"] = "/tmp/wfweb-test-usb"
+    os.makedirs("/tmp/wfweb-test-usb", exist_ok=True)
+
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env=env,
+    )
+
+    rest_base = f"http://127.0.0.1:{rest_port}"
+    info_url = f"{rest_base}/api/v1/radio/info"
+
+    if not _wait_for_connected(info_url, timeout=15.0):
+        proc.terminate()
+        try:
+            out, _ = proc.communicate(timeout=3)
+            print(f"=== wfweb USB output ===", file=sys.stderr)
+            print(out.decode(errors="replace"), file=sys.stderr)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        pytest.fail(f"wfweb (USB) did not connect. PTY: {serial_mock.port_path}")
+
+    freq_url = f"{rest_base}/api/v1/radio/frequency"
+    if not _wait_for_cache(freq_url, timeout=10.0):
+        proc.terminate()
+        try:
+            out, _ = proc.communicate(timeout=3)
+            print(f"=== wfweb USB output (cache) ===", file=sys.stderr)
+            print(out.decode(errors="replace"), file=sys.stderr)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        pytest.fail("wfweb (USB) cache not populated")
+
+    yield proc, web_port
+
+    proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=2)
+
+
+@pytest.fixture(scope="session")
+def usb_rest_url(usb_wfweb_instance):
+    """Base REST API URL for the USB-connected wfweb instance."""
+    _, web_port = usb_wfweb_instance
+    return f"http://127.0.0.1:{web_port + 1}/api/v1/radio"
+
+
+@pytest.fixture(scope="session")
+def usb_poll(usb_rest_url):
+    """Poll fixture for the USB-connected wfweb instance."""
+    def _poll(endpoint, predicate, timeout=5.0):
+        url = f"{usb_rest_url}/{endpoint}"
+        deadline = time.monotonic() + timeout
+        last_data = None
+        while time.monotonic() < deadline:
+            try:
+                r = requests.get(url, timeout=2)
+                if r.status_code == 200:
+                    last_data = r.json() if r.text else {}
+                    if predicate(last_data):
+                        return last_data
+            except (requests.ConnectionError, requests.JSONDecodeError):
+                pass
+            time.sleep(0.2)
+        pytest.fail(f"usb_poll({endpoint}) timed out. Last: {last_data}")
+    return _poll
