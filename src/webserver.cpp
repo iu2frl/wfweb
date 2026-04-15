@@ -2473,6 +2473,12 @@ void webServer::receiveCache(cacheItem item)
     case funcUSBModLevel:
         update["micGain"] = item.value.toInt();
         break;
+    case funcDATAOffMod:
+    {
+        rigInput modInput = item.value.value<rigInput>();
+        update["micSource"] = modInput.name;
+        break;
+    }
     case funcScopeWaveData:
     {
         // Send spectrum data as binary message for efficiency
