@@ -4820,6 +4820,7 @@ function scopeFreqFromDragClientX(clientX) {
     if (scopeDragRectWidth <= 0 || spectStartFreq <= 0 || spectEndFreq <= spectStartFreq) return 0;
     var frac = (clientX - scopeDragRectLeft) / scopeDragRectWidth;
     frac = Math.max(0, Math.min(1, frac));
+    frac = 1 - frac;
     return Math.round((spectStartFreq + (spectEndFreq - spectStartFreq) * frac) * 1e6);
 }
 
