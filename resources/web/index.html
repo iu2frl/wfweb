@@ -2715,23 +2715,7 @@ function handleMessage(msg) {
             if (currentPanel === 'audiomiс') renderAudioMicOverlay();
             break;
         case 'status':
-            // Handle VFO-specific frequencies if available
-            if (msg.vfoAFrequency !== undefined) vfoAFreq = msg.vfoAFrequency;
-            if (msg.vfoBFrequency !== undefined) vfoBFreq = msg.vfoBFrequency;
-            // Update display after VFO frequencies are set
-            if (msg.vfoAFrequency !== undefined || msg.vfoBFrequency !== undefined) {
-                // Determine current VFO frequency for main display
-                if (currentVfo === 'A' && msg.vfoAFrequency !== undefined) {
-                    updateFrequency(msg.vfoAFrequency);
-                } else if (currentVfo === 'B' && msg.vfoBFrequency !== undefined) {
-                    updateFrequency(msg.vfoBFrequency);
-                } else if (msg.frequency !== undefined) {
-                    updateFrequency(msg.frequency);
-                }
-                updateOtherVfoDisplay();
-            } else if (msg.frequency !== undefined) {
-                updateFrequency(msg.frequency);
-            }
+            applyVfoFreqMessage(msg);
             if (msg.mode !== undefined) updateMode(msg.mode);
             if (msg.filter !== undefined) updateFilterBtn(msg.filter);
             if (msg.sMeter !== undefined) updateSMeter(msg.sMeter);
@@ -2761,23 +2745,7 @@ function handleMessage(msg) {
             if (msg.reporterState !== undefined) reporterState = msg.reporterState;
             break;
         case 'update':
-            // Handle VFO-specific frequencies if available
-            if (msg.vfoAFrequency !== undefined) vfoAFreq = msg.vfoAFrequency;
-            if (msg.vfoBFrequency !== undefined) vfoBFreq = msg.vfoBFrequency;
-            // Update display after VFO frequencies are set
-            if (msg.vfoAFrequency !== undefined || msg.vfoBFrequency !== undefined) {
-                // Determine current VFO frequency for main display
-                if (currentVfo === 'A' && msg.vfoAFrequency !== undefined) {
-                    updateFrequency(msg.vfoAFrequency);
-                } else if (currentVfo === 'B' && msg.vfoBFrequency !== undefined) {
-                    updateFrequency(msg.vfoBFrequency);
-                } else if (msg.frequency !== undefined) {
-                    updateFrequency(msg.frequency);
-                }
-                updateOtherVfoDisplay();
-            } else if (msg.frequency !== undefined) {
-                updateFrequency(msg.frequency);
-            }
+            applyVfoFreqMessage(msg);
             if (msg.mode !== undefined) updateMode(msg.mode);
             if (msg.filter !== undefined) updateFilterBtn(msg.filter);
             if (msg.sMeter !== undefined) updateSMeter(msg.sMeter);
@@ -2911,6 +2879,30 @@ function updateOtherVfoDisplay() {
         document.getElementById('otherVfoFreq').textContent = displayText;
     } else {
         document.getElementById('otherVfoFreq').textContent = '---.---.---';
+    }
+}
+
+// Shared handler for VFO-related fields in `status` and `update` messages.
+// The server is the source of truth for which VFO is selected (`selectedVfo`)
+// — sync the local label to it, then refresh the main and side freq displays
+// from the per-VFO cache the server populates (`vfoAFrequency`/`vfoBFrequency`).
+function applyVfoFreqMessage(msg) {
+    if (msg.vfoAFrequency !== undefined) vfoAFreq = msg.vfoAFrequency;
+    if (msg.vfoBFrequency !== undefined) vfoBFreq = msg.vfoBFrequency;
+    if (msg.selectedVfo === 'A' || msg.selectedVfo === 'B') {
+        if (currentVfo !== msg.selectedVfo) {
+            currentVfo = msg.selectedVfo;
+            updateVfoDisplay();
+            renderBottomBar();
+        }
+    }
+    var hasVfoFreq = (msg.vfoAFrequency !== undefined || msg.vfoBFrequency !== undefined);
+    if (hasVfoFreq) {
+        var ownFreq = (currentVfo === 'A') ? vfoAFreq : vfoBFreq;
+        if (ownFreq > 0) updateFrequency(ownFreq);
+        else updateOtherVfoDisplay();
+    } else if (msg.frequency !== undefined) {
+        updateFrequency(msg.frequency);
     }
 }
 
@@ -4229,13 +4221,22 @@ function selectVFO(vfo) {
     currentVfo = vfo;
     updateVfoDisplay();
     renderBottomBar();
-    updateOtherVfoDisplay();
+    // Reflect the new VFO's cached freq on the main display immediately so
+    // the label and frequency stay in sync without waiting for the radio's
+    // round-trip response. The server will follow up with fresh values.
+    var newFreq = (vfo === 'A') ? vfoAFreq : vfoBFreq;
+    if (newFreq > 0) updateFrequency(newFreq);
+    else updateOtherVfoDisplay();
 }
 function swapVFO() {
     send({ cmd: 'swapVFO' });
-    currentVfo = (currentVfo === 'A') ? 'B' : 'A';
-    updateVfoDisplay();
-    updateOtherVfoDisplay();
+    // VFO Swap exchanges the contents of A and B but leaves the selection
+    // unchanged on the rig. Mirror that locally so the side display flips
+    // immediately and the next radio update doesn't briefly disagree.
+    var t = vfoAFreq; vfoAFreq = vfoBFreq; vfoBFreq = t;
+    var newFreq = (currentVfo === 'A') ? vfoAFreq : vfoBFreq;
+    if (newFreq > 0) updateFrequency(newFreq);
+    else updateOtherVfoDisplay();
     renderBottomBar();
 }
 function equalizeVFO() { send({ cmd: 'equalizeVFO' }); }
