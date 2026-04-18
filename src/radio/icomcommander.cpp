@@ -188,8 +188,14 @@ void icomCommander::closeComm()
     comm = Q_NULLPTR;
 
     if (udpHandlerThread != Q_NULLPTR) {
+        // When the thread finishes, the queued deleteLater posted via
+        // connect(udpHandlerThread, finished, udp, deleteLater) is
+        // processed on the UDP thread — so ~icomUdpBase() runs there and
+        // sends the 0x05 disconnect packet via its QUdpSocket.
         udpHandlerThread->quit();
         udpHandlerThread->wait();
+        delete udpHandlerThread; // avoid leaking QThread objects on reconnect
+        udpHandlerThread = Q_NULLPTR;
     }
     udp = Q_NULLPTR;
 
@@ -220,7 +226,9 @@ void icomCommander::commonSetup()
     rigCaps.commands.insert(funcPowerControl,funcType(funcPowerControl, QString("Power Control"),QByteArrayLiteral("\x18"),0,0,false,false,true,false,1,false));
     rigCaps.commandsReverse.insert(QByteArrayLiteral("\x18"),funcPowerControl);
 
-    connect(queue,SIGNAL(haveCommand(funcs,QVariant,uchar)),this,SLOT(receiveCommand(funcs,QVariant,uchar)));
+    // UniqueConnection so reconnects (closeComm → commSetup → commonSetup)
+    // don't stack duplicate connections that would fire receiveCommand twice.
+    connect(queue,SIGNAL(haveCommand(funcs,QVariant,uchar)),this,SLOT(receiveCommand(funcs,QVariant,uchar)),Qt::UniqueConnection);
     oldScopeMode = 0xff;
 
     pttAllowed = true; // This is for developing, set to false for "safe" debugging. Set to true for deployment.

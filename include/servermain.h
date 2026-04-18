@@ -189,6 +189,8 @@ signals:
 public slots:
     void powerRigOff();
     void powerRigOn();
+    void disconnectLan();
+    void reconnectLan();
 
 private slots:
 

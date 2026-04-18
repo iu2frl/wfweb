@@ -1797,6 +1797,12 @@ void webServer::handleCommand(QWebSocket *client, const QJsonObject &cmd)
             emit requestPowerOff();
         }
     }
+    else if (type == "disconnectLan") {
+        emit requestLanDisconnect();
+    }
+    else if (type == "reconnectLan") {
+        emit requestLanReconnect();
+    }
     else if (type == "getMemories") {
         if (!queue || !rigCaps) {
             QJsonObject err;
@@ -2079,6 +2085,9 @@ QJsonObject webServer::buildInfoJson() const
 #endif
     info["freedvModes"] = fdvModes;
 
+    info["isLan"] = lanMode;
+    info["lanConnected"] = lanConnected;
+
     if (rigCaps) {
         info["connected"] = true;
         info["model"] = rigCaps->modelName;
@@ -2245,6 +2254,9 @@ QJsonObject webServer::buildStatusJson()
         rigPoweredOn = powerState.value.toBool();
     }
     status["powerState"] = rigPoweredOn;
+
+    status["isLan"] = lanMode;
+    status["lanConnected"] = lanConnected;
 
     // FreeDV
     status["freedv"] = freedvEnabled;
@@ -2758,6 +2770,19 @@ codecType webServer::codecByteToType(quint8 codec)
     default:
         return LPCM;
     }
+}
+
+void webServer::setLanInfo(bool isLan, bool connected)
+{
+    bool changed = (lanMode != isLan) || (lanConnected != connected);
+    lanMode = isLan;
+    lanConnected = connected;
+    if (!changed) return;
+    QJsonObject obj;
+    obj["type"] = "lanStatus";
+    obj["isLan"] = lanMode;
+    obj["lanConnected"] = lanConnected;
+    sendJsonToAll(obj);
 }
 
 void webServer::setupAudio(quint8 codec, quint32 sampleRate)
