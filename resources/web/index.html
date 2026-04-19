@@ -1956,8 +1956,9 @@ body.digi-open .digi-bar {
         <div style="font-size: 36px; font-weight: bold; color: #0aa; margin-bottom: 6px; text-shadow: 0 0 20px rgba(0,170,170,0.4);">wfweb</div>
         <div id="powerOffModel" style="font-size: 14px; color: #888; margin-bottom: 24px;"></div>
         <div id="powerOffMsg" style="font-size: 16px; color: #777; margin-bottom: 28px;">Radio is powered off</div>
-        <div id="powerOffBtns">
-            <button onclick="doPowerOn()" style="padding: 14px 44px; font-size: 18px; font-weight: bold; color: #000; background: linear-gradient(135deg, #0c0 0%, #0a0 100%); border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,170,0,0.4); transition: all 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(0,170,0,0.6)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 15px rgba(0,170,0,0.4)';">Power On</button>
+        <div id="powerOffBtns" style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button id="powerOnBtn" onclick="doPowerOn()" style="padding: 14px 44px; font-size: 18px; font-weight: bold; color: #000; background: linear-gradient(135deg, #0c0 0%, #0a0 100%); border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,170,0,0.4); transition: all 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(0,170,0,0.6)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 15px rgba(0,170,0,0.4)';">Power On</button>
+            <button id="lanConnBtn" onclick="toggleLanConnection()" style="display: none; padding: 14px 32px; font-size: 18px; font-weight: bold; color: #fff; background: linear-gradient(135deg, #266 0%, #155 100%); border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,60,80,0.4); transition: all 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(0,60,80,0.6)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 15px rgba(0,60,80,0.4)';">Disconnect LAN</button>
         </div>
     </div>
     <div style="position: absolute; bottom: 20px; left: 20px; font-size: 11px; color: #555;">
@@ -2385,6 +2386,8 @@ var tuneStep = 1000;
 var isTransmitting = false;
 var isSplit = false;
 var rigPoweredOn = true;
+var isLan = false;
+var lanConnected = false;
 var reconnectTimer = null;
 var defaultModes = ['LSB', 'USB', 'AM', 'CW', 'RTTY', 'FM', 'CW-R'];
 
@@ -2660,6 +2663,9 @@ function handleMessage(msg) {
             }
             if (msg.model) rigModelName = msg.model;
             if (msg.freedvModes) freedvModes = msg.freedvModes;
+            if (msg.isLan !== undefined || msg.lanConnected !== undefined) {
+                updateLanStatus(!!msg.isLan, msg.lanConnected !== undefined ? !!msg.lanConnected : lanConnected);
+            }
             if (msg.connected) {
                 if (msg.modes) populateModes(msg.modes);
                 if (msg.hasSpectrum) { hasSpectrum = true; spectAmpMax = msg.spectAmpMax || 160; }
@@ -2740,9 +2746,16 @@ function handleMessage(msg) {
             if (msg.pbtOuter !== undefined) updateSlider('pbtOuter', msg.pbtOuter);
             if (msg.filterShape !== undefined) updateFilterShapeBtn(msg.filterShape);
             if (msg.powerState !== undefined) updatePowerState(msg.powerState);
+            if (msg.isLan !== undefined || msg.lanConnected !== undefined) {
+                updateLanStatus(msg.isLan !== undefined ? !!msg.isLan : isLan,
+                                msg.lanConnected !== undefined ? !!msg.lanConnected : lanConnected);
+            }
             if (msg.freedv !== undefined) updateFreeDVStatus(msg);
             if (msg.reporterEnabled !== undefined) { reporterEnabled = msg.reporterEnabled; var rcb = document.getElementById('digiReporterEnable'); if (rcb) rcb.checked = reporterEnabled; }
             if (msg.reporterState !== undefined) reporterState = msg.reporterState;
+            break;
+        case 'lanStatus':
+            updateLanStatus(!!msg.isLan, !!msg.lanConnected);
             break;
         case 'update':
             applyVfoFreqMessage(msg);
@@ -4292,6 +4305,55 @@ function updatePowerState(on) {
             audioWasEnabled = true;
             stopAudio();
         }
+    }
+    refreshPowerOffButtons();
+}
+
+function updateLanStatus(il, conn) {
+    var wasConnected = lanConnected;
+    isLan = il;
+    lanConnected = conn;
+    if (isLan && !lanConnected) {
+        // Disconnected from the radio — show the off-screen overlay so the
+        // user can reach the Connect button regardless of power state.
+        var overlay = document.getElementById('powerOffOverlay');
+        if (overlay) overlay.classList.add('visible');
+        if (audioEnabled) { audioWasEnabled = true; stopAudio(); }
+    } else if (isLan && !wasConnected && lanConnected && rigPoweredOn) {
+        // Reconnected while radio is on — hide overlay
+        var overlay = document.getElementById('powerOffOverlay');
+        if (overlay) overlay.classList.remove('visible');
+    }
+    refreshPowerOffButtons();
+}
+
+function refreshPowerOffButtons() {
+    var pOnBtn = document.getElementById('powerOnBtn');
+    var lanBtn = document.getElementById('lanConnBtn');
+    var msg = document.getElementById('powerOffMsg');
+    if (!pOnBtn || !lanBtn) return;
+    if (!isLan) {
+        lanBtn.style.display = 'none';
+        pOnBtn.style.display = '';
+        return;
+    }
+    lanBtn.style.display = '';
+    if (lanConnected) {
+        lanBtn.textContent = 'Disconnect LAN';
+        pOnBtn.style.display = '';
+        if (msg && !rigPoweredOn) msg.textContent = 'Radio is powered off';
+    } else {
+        lanBtn.textContent = 'Connect LAN';
+        pOnBtn.style.display = 'none';
+        if (msg) msg.textContent = 'Disconnected from radio';
+    }
+}
+
+function toggleLanConnection() {
+    if (lanConnected) {
+        send({ cmd: 'disconnectLan' });
+    } else {
+        send({ cmd: 'reconnectLan' });
     }
 }
 // ============================================================

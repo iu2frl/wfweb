@@ -75,6 +75,8 @@ signals:
     void closed();
     void requestPowerOn();
     void requestPowerOff();
+    void requestLanDisconnect();
+    void requestLanReconnect();
     void setupConverter(QAudioFormat inFormat, codecType inCodec,
                         QAudioFormat outFormat, codecType outCodec,
                         quint8 opusComplexity, quint8 resampleQuality);
@@ -101,6 +103,7 @@ public slots:
     void receiveRxAudio(audioPacket audio);
     void setupAudio(quint8 codec, quint32 sampleRate);
     void setupUsbAudio(quint32 sampleRate);
+    void setLanInfo(bool isLan, bool connected);
 private slots:
     // HTTP
     void onHttpConnection();
@@ -182,6 +185,8 @@ private:
     QTimer *statusTimer = nullptr;
     QMimeDatabase mimeDb;
     bool rigPoweredOn = true;
+    bool lanMode = false;
+    bool lanConnected = false;
 
     // SSL
     bool sslEnabled = false;

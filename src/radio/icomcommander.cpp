@@ -182,14 +182,27 @@ void icomCommander::commSetup(QHash<quint16,rigInfo> rigList, quint16 rigCivAddr
 void icomCommander::closeComm()
 {
     qDebug(logRig()) << "Closing rig comms";
+    // Clear the queue's rigCaps pointer so that when determineRigCaps()
+    // runs again on reconnect its setRigCaps(&rigCaps) call actually
+    // re-emits rigCapsUpdated — the signal is guarded by a pointer-equality
+    // check that would otherwise suppress the reconnect notification.
+    if (queue != Q_NULLPTR) {
+        queue->setRigCaps(Q_NULLPTR);
+    }
     if (comm != Q_NULLPTR) {
         delete comm;
     }
     comm = Q_NULLPTR;
 
     if (udpHandlerThread != Q_NULLPTR) {
+        // When the thread finishes, the queued deleteLater posted via
+        // connect(udpHandlerThread, finished, udp, deleteLater) is
+        // processed on the UDP thread — so ~icomUdpBase() runs there and
+        // sends the 0x05 disconnect packet via its QUdpSocket.
         udpHandlerThread->quit();
         udpHandlerThread->wait();
+        delete udpHandlerThread; // avoid leaking QThread objects on reconnect
+        udpHandlerThread = Q_NULLPTR;
     }
     udp = Q_NULLPTR;
 
@@ -211,6 +224,12 @@ void icomCommander::commonSetup()
     lookingForRig = true;
     foundRig = false;
 
+    // Reconnect path: without resetting these, determineRigCaps() is skipped
+    // (gated on modelID == 0), leaving rigCaps.commands nearly empty so every
+    // incoming CI-V response logs "Unsupported command received from rig".
+    rigCaps.modelID = 0;
+    haveRigCaps = false;
+
     // Add the below commands so we can get a response until we have received rigCaps
     rigCaps.commands.clear();
     rigCaps.commandsReverse.clear();
@@ -220,7 +239,9 @@ void icomCommander::commonSetup()
     rigCaps.commands.insert(funcPowerControl,funcType(funcPowerControl, QString("Power Control"),QByteArrayLiteral("\x18"),0,0,false,false,true,false,1,false));
     rigCaps.commandsReverse.insert(QByteArrayLiteral("\x18"),funcPowerControl);
 
-    connect(queue,SIGNAL(haveCommand(funcs,QVariant,uchar)),this,SLOT(receiveCommand(funcs,QVariant,uchar)));
+    // UniqueConnection so reconnects (closeComm → commSetup → commonSetup)
+    // don't stack duplicate connections that would fire receiveCommand twice.
+    connect(queue,SIGNAL(haveCommand(funcs,QVariant,uchar)),this,SLOT(receiveCommand(funcs,QVariant,uchar)),Qt::UniqueConnection);
     oldScopeMode = 0xff;
 
     pttAllowed = true; // This is for developing, set to false for "safe" debugging. Set to true for deployment.

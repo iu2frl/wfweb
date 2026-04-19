@@ -90,6 +90,8 @@ servermain::servermain(const QString settingsFile, const cmdLineOverrides& overr
         connect(webThread, SIGNAL(finished()), web, SLOT(deleteLater()));
         connect(web, &webServer::requestPowerOn, this, &servermain::powerRigOn);
         connect(web, &webServer::requestPowerOff, this, &servermain::powerRigOff);
+        connect(web, &webServer::requestLanDisconnect, this, &servermain::disconnectLan);
+        connect(web, &webServer::requestLanReconnect, this, &servermain::reconnectLan);
         webThread->start();
         QMetaObject::invokeMethod(web, "init", Qt::QueuedConnection,
             Q_ARG(quint16, effectiveWebPort), Q_ARG(quint16, effectiveWebPort + 1));
@@ -97,6 +99,11 @@ servermain::servermain(const QString settingsFile, const cmdLineOverrides& overr
     }
 
     openRig();
+
+    if (web != Q_NULLPTR) {
+        QMetaObject::invokeMethod(web, "setLanInfo", Qt::QueuedConnection,
+            Q_ARG(bool, prefs.enableLAN), Q_ARG(bool, prefs.enableLAN));
+    }
 
     setServerToPrefs();
 
@@ -115,6 +122,12 @@ servermain::~servermain()
     }
     for (RIGCONFIG* radio : serverConfig.rigs)
     {
+        if (radio->rig != Q_NULLPTR && radio->rigThread != Q_NULLPTR && radio->rigThread->isRunning())
+        {
+            // Synchronously close comms so ~icomUdpBase() runs and sends
+            // the 0x05 disconnect packet, releasing the radio's LAN slot.
+            QMetaObject::invokeMethod(radio->rig, "closeComm", Qt::BlockingQueuedConnection);
+        }
         if (radio->rigThread != Q_NULLPTR)
         {
             radio->rigThread->quit();
@@ -335,6 +348,11 @@ void servermain::receiveRigCaps(rigCapabilities* rigCaps)
 
     // Entry point for unknown rig being identified at the start of the program.
     //now we know what the rig ID is:
+
+    // closeComm() clears the queue's rigCaps pointer during LAN teardown,
+    // which emits rigCapsUpdated(nullptr). Ignore that — the reconnect
+    // will re-fire with a valid pointer after determineRigCaps() runs.
+    if (rigCaps == Q_NULLPTR) return;
 
     // Signal may come from rigCommander or cachingQueue
     rigCommander* sender = qobject_cast<rigCommander*>(QObject::sender());
@@ -1015,6 +1033,38 @@ void servermain::initPeriodicPolling()
             qInfo(logSystem()) << "Periodic polling restored for" << rigCaps->modelName;
             break; // Only one rig supported currently
         }
+    }
+}
+
+void servermain::disconnectLan()
+{
+    if (!prefs.enableLAN) return;
+    qInfo(logSystem()) << "disconnectLan() closing rig LAN session";
+    // Flush any pending outbound commands; further poll traffic will be
+    // silently dropped since the rig's comm/udp signal targets are gone.
+    queue->clear();
+    // Synchronously close comms so ~icomUdpBase() runs and sends the 0x05
+    // disconnect packet before we tell the frontend we're disconnected.
+    for (RIGCONFIG* radio : serverConfig.rigs) {
+        if (radio->rig != Q_NULLPTR && radio->rigThread != Q_NULLPTR && radio->rigThread->isRunning()) {
+            QMetaObject::invokeMethod(radio->rig, "closeComm", Qt::BlockingQueuedConnection);
+        }
+        radio->rigAvailable = false;
+    }
+    if (web != Q_NULLPTR) {
+        QMetaObject::invokeMethod(web, "setLanInfo", Qt::QueuedConnection,
+            Q_ARG(bool, true), Q_ARG(bool, false));
+    }
+}
+
+void servermain::reconnectLan()
+{
+    if (!prefs.enableLAN) return;
+    qInfo(logSystem()) << "reconnectLan() re-opening rig LAN session";
+    openRig();
+    if (web != Q_NULLPTR) {
+        QMetaObject::invokeMethod(web, "setLanInfo", Qt::QueuedConnection,
+            Q_ARG(bool, true), Q_ARG(bool, true));
     }
 }
 
